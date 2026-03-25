@@ -112,6 +112,11 @@ In Runpod Console:
 6. Add TCP port `22` (SSH).
 7. Save Template.
 
+Template reference used for this project:
+
+- Name: `avatary-body-gen`
+- Template ID: `aocbk7yxvz`
+
 Optional environment variables:
 
 - `CHECKPOINT_IDS_TO_DOWNLOAD`: comma-separated CivitAI model IDs
@@ -122,7 +127,7 @@ Optional environment variables:
 ### 6) Deploy a Pod from the template
 
 1. Go to Pods -> Deploy.
-2. Choose your template.
+2. Choose template `avatary-body-gen` (`aocbk7yxvz`).
 3. Select a GPU that matches your workload.
 4. Attach the network volume `avatary-body-gen` for persistent models/workflows at `/workspace`.
 
