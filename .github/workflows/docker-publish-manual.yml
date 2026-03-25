@@ -3,9 +3,18 @@ name: Publish Docker Image (Manual)
 on:
   workflow_dispatch:
     inputs:
-      version_tag:
-        description: "Docker tag to publish (example: v1.0.3)"
+      bump_type:
+        description: "Version bump type"
         required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+        default: patch
+      base_version:
+        description: "Optional base version (example: v1.0.3). Leave empty to auto-detect."
+        required: false
         type: string
       push_latest:
         description: "Also push :latest"
@@ -88,6 +97,119 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Compute version tag
+        id: version
+        env:
+          INPUT_BASE_VERSION: ${{ inputs.base_version }}
+          INPUT_BUMP_TYPE: ${{ inputs.bump_type }}
+          INPUT_IMAGE_NAME: ${{ inputs.image_name }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import re
+          import urllib.request
+          from pathlib import Path
+
+          bump_type = os.environ["INPUT_BUMP_TYPE"].strip().lower()
+          base_version_input = os.environ.get("INPUT_BASE_VERSION", "").strip()
+          image_name = os.environ["INPUT_IMAGE_NAME"].strip()
+          username = os.environ["DOCKERHUB_USERNAME"].strip()
+
+          semver_pattern = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)$")
+
+          def parse_semver(value: str):
+              match = semver_pattern.match(value.strip())
+              if not match:
+                  return None
+              return (int(match.group(1)), int(match.group(2)), int(match.group(3)))
+
+          def format_semver(parts):
+              return f"v{parts[0]}.{parts[1]}.{parts[2]}"
+
+          def bump(parts, kind: str):
+              major, minor, patch = parts
+              if kind == "major":
+                  return (major + 1, 0, 0)
+              if kind == "minor":
+                  return (major, minor + 1, 0)
+              return (major, minor, patch + 1)
+
+          def from_package_json():
+              pkg_path = Path("package.json")
+              if not pkg_path.exists():
+                  return None
+              try:
+                  data = json.loads(pkg_path.read_text(encoding="utf-8"))
+              except Exception:
+                  return None
+              version = str(data.get("version", "")).strip()
+              return parse_semver(version)
+
+          def from_dockerhub():
+              tags = []
+              url = f"https://hub.docker.com/v2/repositories/{username}/{image_name}/tags?page_size=100"
+              for _ in range(3):
+                  try:
+                      with urllib.request.urlopen(url, timeout=15) as resp:
+                          payload = json.loads(resp.read().decode("utf-8"))
+                  except Exception:
+                      break
+                  for item in payload.get("results", []):
+                      name = str(item.get("name", "")).strip()
+                      parts = parse_semver(name)
+                      if parts is not None:
+                          tags.append(parts)
+                  url = payload.get("next")
+                  if not url:
+                      break
+              if not tags:
+                  return None
+              return max(tags)
+
+          if bump_type not in {"patch", "minor", "major"}:
+              raise SystemExit(f"Unsupported bump type: {bump_type}")
+
+          base_parts = None
+          base_source = ""
+
+          if base_version_input:
+              base_parts = parse_semver(base_version_input)
+              if base_parts is None:
+                  raise SystemExit(
+                      "Invalid base_version. Expected semantic version like v1.2.3."
+                  )
+              base_source = f"input:{base_version_input}"
+          else:
+              base_parts = from_dockerhub()
+              if base_parts is not None:
+                  base_source = f"dockerhub:{format_semver(base_parts)}"
+              else:
+                  base_parts = from_package_json()
+                  if base_parts is not None:
+                      base_source = f"package.json:{format_semver(base_parts)}"
+                  else:
+                      base_parts = (0, 0, 0)
+                      base_source = "fallback:v0.0.0"
+
+          next_parts = bump(base_parts, bump_type)
+          next_tag = format_semver(next_parts)
+
+          out = os.environ["GITHUB_OUTPUT"]
+          with open(out, "a", encoding="utf-8") as f:
+              f.write(f"base_version={format_semver(base_parts)}\n")
+              f.write(f"base_source={base_source}\n")
+              f.write(f"version_tag={next_tag}\n")
+              f.write(f"bump_type={bump_type}\n")
+          PY
+
+      - name: Print selected version
+        run: |
+          echo "Base source: ${{ steps.version.outputs.base_source }}"
+          echo "Bump type:   ${{ steps.version.outputs.bump_type }}"
+          echo "Next tag:    ${{ steps.version.outputs.version_tag }}"
+
       - name: Build and push version tag
         uses: docker/build-push-action@v6
         with:
@@ -96,7 +218,7 @@ jobs:
           push: true
           provenance: false
           sbom: false
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{ inputs.image_name }}:${{ inputs.version_tag }}
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{ inputs.image_name }}:${{ steps.version.outputs.version_tag }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -105,4 +227,4 @@ jobs:
         run: |
           docker buildx imagetools create \
             -t "${{ secrets.DOCKERHUB_USERNAME }}/${{ inputs.image_name }}:latest" \
-            "${{ secrets.DOCKERHUB_USERNAME }}/${{ inputs.image_name }}:${{ inputs.version_tag }}"
+            "${{ secrets.DOCKERHUB_USERNAME }}/${{ inputs.image_name }}:${{ steps.version.outputs.version_tag }}"
