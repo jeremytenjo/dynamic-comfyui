@@ -1,10 +1,10 @@
-name: Publish Docker Image (Manual)
+name: Publish Docker Image
 
 on:
   workflow_dispatch:
     inputs:
       bump_type:
-        description: "Version bump type"
+        description: 'Version bump type'
         required: true
         type: choice
         options:
@@ -13,16 +13,16 @@ on:
           - major
         default: patch
       base_version:
-        description: "Optional base version (example: v1.0.3). Leave empty to auto-detect."
+        description: 'Optional base version (example: v1.0.3). Leave empty to auto-detect.'
         required: false
         type: string
       push_latest:
-        description: "Also push :latest"
+        description: 'Also push :latest'
         required: true
         type: boolean
         default: false
       image_name:
-        description: "Docker image name"
+        description: 'Docker image name'
         required: true
         type: string
         default: body-gen-comfyui
@@ -41,7 +41,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: "3.12"
+          python-version: '3.12'
 
       - name: Check compatibility policy
         run: python3 scripts/check-compatibility.py
