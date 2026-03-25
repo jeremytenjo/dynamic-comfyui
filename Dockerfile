@@ -9,6 +9,9 @@ RUN apt-get update --yes && \
     git \
     curl \
     aria2 \
+    wget \
+    curl \
+    zip \
     libgoogle-perftools4 && \
     rm -rf /var/lib/apt/lists/*
 
