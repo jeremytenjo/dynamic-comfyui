@@ -100,6 +100,16 @@ docker login
 docker push YOUR_DOCKER_USERNAME/body-gen-comfyui:v1
 ```
 
+Optional helper script for versioned publishes:
+
+```bash
+# Example: publish v1.2 to Docker Hub
+node scripts/publish-dockerhub.js v1.2 --username YOUR_DOCKER_USERNAME
+
+# Also push :latest
+node scripts/publish-dockerhub.js v1.2 --username YOUR_DOCKER_USERNAME --latest
+```
+
 ### 5) Create the Runpod Pod Template
 
 In Runpod Console:
