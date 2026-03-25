@@ -6,9 +6,9 @@
     "@clack/prompts": "0.10.1"
   },
   "scripts": {
-    "publish:dockerhub": "node scripts/publish-dockerhub.js",
-    "publish:patch": "node scripts/publish-dockerhub.js --bump patch --latest",
-    "publish:minor": "node scripts/publish-dockerhub.js --bump minor --latest",
-    "publish:major": "node scripts/publish-dockerhub.js --bump major --latest"
+    "publish:dockerhub": "node scripts/publish-dockerhub.js --username tenjojeremy",
+    "publish:patch": "node scripts/publish-dockerhub.js --username tenjojeremy --bump patch --latest",
+    "publish:minor": "node scripts/publish-dockerhub.js --username tenjojeremy --bump minor --latest",
+    "publish:major": "node scripts/publish-dockerhub.js --username tenjojeremy --bump major --latest"
   }
 }
