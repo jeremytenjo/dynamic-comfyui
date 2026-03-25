@@ -108,7 +108,15 @@ node scripts/publish-dockerhub.js v1.2 --username YOUR_DOCKER_USERNAME
 
 # Also push :latest
 node scripts/publish-dockerhub.js v1.2 --username YOUR_DOCKER_USERNAME --latest
+
+# Fast path: auto-bump from your last published version and push :latest
+npm run publish:patch
 ```
+
+Tips:
+
+- The script stores your last successful values in `.publish-dockerhub.json` so you do not re-enter username/image each run.
+- You can auto-bump semantic versions with `--bump patch|minor|major`.
 
 ### 5) Create the Runpod Pod Template
 
