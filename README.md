@@ -77,6 +77,7 @@ CMD ["/run.sh"]
 Notes:
 
 - `run.sh` starts Runpod base services first (including SSH), then runs `start.sh`.
+- The Docker build excludes the editable `SageAttention` requirement; `start.sh` installs it at runtime from a pinned commit.
 - The first boot can take time because models and SageAttention are downloaded/built.
 
 ### 3) Build locally

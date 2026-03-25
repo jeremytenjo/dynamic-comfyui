@@ -22,7 +22,8 @@ COPY requirements.txt /tmp/requirements.txt
 
 # Upgrade pip and install Python dependencies required by this template.
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r /tmp/requirements.txt
+    grep -v "SageAttention.git" /tmp/requirements.txt > /tmp/requirements.image.txt && \
+    pip install --no-cache-dir -r /tmp/requirements.image.txt
 
 # Bundle the ComfyUI source tree into the container image.
 COPY ComfyUI /ComfyUI
