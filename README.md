@@ -66,11 +66,11 @@ RUN pip install --no-cache-dir --upgrade pip && \
   pip install --no-cache-dir -r /tmp/requirements.txt
 
 COPY ComfyUI /ComfyUI
-COPY start.sh /start.sh
-RUN chmod +x /start.sh
+COPY start.sh /run.sh
+RUN chmod +x /run.sh
 
 # Keep base image services (Jupyter/SSH) and run our bootstrap flow
-CMD ["/start.sh"]
+CMD ["/run.sh"]
 ```
 
 Notes:

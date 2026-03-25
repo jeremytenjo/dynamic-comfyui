@@ -17,10 +17,10 @@ RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r /tmp/requirements.txt
 
 COPY ComfyUI /ComfyUI
-COPY start.sh /start.sh
-RUN chmod +x /start.sh
+COPY start.sh /run.sh
+RUN chmod +x /run.sh
 
 EXPOSE 8188 8888
 
-# Keep base image services and run the template bootstrap flow.
-CMD ["/start.sh"]
+# Run this template bootstrap flow via a dedicated startup script.
+CMD ["/run.sh"]
