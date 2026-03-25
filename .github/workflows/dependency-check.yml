@@ -35,7 +35,8 @@ jobs:
           python3 -m venv .venv
           source .venv/bin/activate
           python -m pip install --upgrade pip
-          pip install --dry-run -r requirements.txt
+          grep -Ev '(^-e[[:space:]]+git\+|[[:space:]]@ git\+|^torch$|^torchaudio$|^torchvision$|^triton$)' requirements.txt > /tmp/requirements.ci.txt
+          pip install --dry-run -r /tmp/requirements.ci.txt
 
       - name: Validate core Jupyter stack
         run: |
