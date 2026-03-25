@@ -50,6 +50,10 @@ mark_stage() {
     LAST_STAGE_TS="$now_ts"
 }
 
+# Polling and log-throttle intervals to keep startup output readable.
+POLL_INTERVAL_S=5
+LOG_INTERVAL_S=30
+
 # Check if NETWORK_VOLUME exists; if not, use root directory instead
 if [ ! -d "$NETWORK_VOLUME" ]; then
     echo "NETWORK_VOLUME directory '$NETWORK_VOLUME' does not exist. You are NOT using a network volume. Setting NETWORK_VOLUME to '/' (root directory)."
@@ -185,9 +189,13 @@ download_model "https://huggingface.co/dci05049/spicy-sdxl/resolve/main/leak_cor
 
 
 # Keep checking until no aria2c processes are running
+download_wait_elapsed=0
 while pgrep -x "aria2c" > /dev/null; do
-    echo "Models are downloading (In Progress)"
-    sleep 5  # Check every 5 seconds
+    if [ $((download_wait_elapsed % LOG_INTERVAL_S)) -eq 0 ]; then
+        echo "Models are downloading (in progress)..."
+    fi
+    sleep "$POLL_INTERVAL_S"
+    download_wait_elapsed=$((download_wait_elapsed + POLL_INTERVAL_S))
 done
 
 mark_stage "baseline_model_downloads"
@@ -225,9 +233,13 @@ echo "Scheduled $download_count downloads in background"
 
 # Wait for all downloads to complete
 echo "Waiting for downloads to complete..."
+optional_download_wait_elapsed=0
 while pgrep -x "aria2c" > /dev/null; do
-    echo "🔽 LoRA Downloads still in progress..."
-    sleep 5  # Check every 5 seconds
+    if [ $((optional_download_wait_elapsed % LOG_INTERVAL_S)) -eq 0 ]; then
+        echo "LoRA downloads still in progress..."
+    fi
+    sleep "$POLL_INTERVAL_S"
+    optional_download_wait_elapsed=$((optional_download_wait_elapsed + POLL_INTERVAL_S))
 done
 
 mark_stage "optional_model_downloads"
@@ -302,10 +314,14 @@ mark_stage "lora_rename"
 
 # Wait for SageAttention build to complete
 echo "Waiting for SageAttention build to complete..."
+sage_wait_elapsed=0
 while ! [ -f /tmp/sage_build_done ]; do
     if ps -p $SAGE_PID > /dev/null 2>&1; then
-        echo "⚙️  SageAttention build in progress, this may take up to 5 minutes."
-        sleep 5
+        if [ $((sage_wait_elapsed % LOG_INTERVAL_S)) -eq 0 ]; then
+            echo "SageAttention build in progress..."
+        fi
+        sleep "$POLL_INTERVAL_S"
+        sage_wait_elapsed=$((sage_wait_elapsed + POLL_INTERVAL_S))
     else
         # Process finished but no completion marker - check if it failed
         if ! [ -f /tmp/sage_build_done ]; then
@@ -331,6 +347,7 @@ nohup python3 "$COMFYUI_DIR/main.py" --listen --use-sage-attention > "$NETWORK_V
     # Counter for timeout
     counter=0
     max_wait=45
+    comfy_status_log_interval=10
 
     until curl --silent --fail "$URL" --output /dev/null; do
         if [ $counter -ge $max_wait ]; then
@@ -338,7 +355,9 @@ nohup python3 "$COMFYUI_DIR/main.py" --listen --use-sage-attention > "$NETWORK_V
             break
         fi
 
-        echo "🔄  ComfyUI Starting Up... You can view the startup logs here: $NETWORK_VOLUME/comfyui_${RUNPOD_POD_ID}_nohup.log"
+        if [ $((counter % comfy_status_log_interval)) -eq 0 ]; then
+            echo "ComfyUI starting up... logs: $NETWORK_VOLUME/comfyui_${RUNPOD_POD_ID}_nohup.log"
+        fi
         sleep 2
         counter=$((counter + 2))
     done
