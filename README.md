@@ -66,8 +66,9 @@ RUN pip install --no-cache-dir --upgrade pip && \
   pip install --no-cache-dir -r /tmp/requirements.txt
 
 COPY ComfyUI /ComfyUI
-COPY start.sh /run.sh
-RUN chmod +x /run.sh
+COPY start.sh /opt/template-start.sh
+COPY run.sh /run.sh
+RUN chmod +x /run.sh /opt/template-start.sh
 
 # Keep base image services (Jupyter/SSH) and run our bootstrap flow
 CMD ["/run.sh"]
@@ -75,7 +76,7 @@ CMD ["/run.sh"]
 
 Notes:
 
-- `start.sh` already starts JupyterLab and ComfyUI.
+- `run.sh` starts Runpod base services first (including SSH), then runs `start.sh`.
 - The first boot can take time because models and SageAttention are downloaded/built.
 
 ### 3) Build locally
@@ -108,7 +109,8 @@ In Runpod Console:
 3. Container Disk: at least 30 GB recommended for this stack.
 4. Add HTTP port `8188` (ComfyUI).
 5. Add HTTP port `8888` (JupyterLab).
-6. Save Template.
+6. Add TCP port `22` (SSH).
+7. Save Template.
 
 Optional environment variables:
 
@@ -121,7 +123,8 @@ Optional environment variables:
 2. Choose your template.
 3. Select a GPU that matches your workload.
 4. Attach a network volume if you want persistent models/workflows (`/workspace`).
-5. Deploy.
+5. Ensure `SSH Terminal Access` is checked in deployment options.
+6. Deploy.
 
 ### 7) Verify startup
 

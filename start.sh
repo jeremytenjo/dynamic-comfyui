@@ -41,11 +41,19 @@ URL="http://127.0.0.1:8188"
 if [ ! -d "$NETWORK_VOLUME" ]; then
     echo "NETWORK_VOLUME directory '$NETWORK_VOLUME' does not exist. You are NOT using a network volume. Setting NETWORK_VOLUME to '/' (root directory)."
     NETWORK_VOLUME="/"
-    echo "NETWORK_VOLUME directory doesn't exist. Starting JupyterLab on root directory..."
-    jupyter-lab --ip=0.0.0.0 --allow-root --no-browser --NotebookApp.token='' --NotebookApp.password='' --ServerApp.allow_origin='*' --ServerApp.allow_credentials=True --notebook-dir=/ &
+fi
+
+# Optionally skip Jupyter when the base Runpod service already starts it.
+if [ "${START_JUPYTER:-1}" = "1" ]; then
+    if [ "$NETWORK_VOLUME" = "/" ]; then
+        echo "NETWORK_VOLUME directory doesn't exist. Starting JupyterLab on root directory..."
+        jupyter-lab --ip=0.0.0.0 --allow-root --no-browser --NotebookApp.token='' --NotebookApp.password='' --ServerApp.allow_origin='*' --ServerApp.allow_credentials=True --notebook-dir=/ &
+    else
+        echo "NETWORK_VOLUME directory exists. Starting JupyterLab..."
+        jupyter-lab --ip=0.0.0.0 --allow-root --no-browser --NotebookApp.token='' --NotebookApp.password='' --ServerApp.allow_origin='*' --ServerApp.allow_credentials=True --notebook-dir=/workspace &
+    fi
 else
-    echo "NETWORK_VOLUME directory exists. Starting JupyterLab..."
-    jupyter-lab --ip=0.0.0.0 --allow-root --no-browser --NotebookApp.token='' --NotebookApp.password='' --ServerApp.allow_origin='*' --ServerApp.allow_credentials=True --notebook-dir=/workspace &
+    echo "Skipping JupyterLab startup in template script (START_JUPYTER=${START_JUPYTER})."
 fi
 
 COMFYUI_DIR="$NETWORK_VOLUME/ComfyUI"

@@ -13,7 +13,6 @@ RUN apt-get update --yes && \
     curl \
     aria2 \
     wget \
-    curl \
     zip \
     libgoogle-perftools4 && \
     rm -rf /var/lib/apt/lists/*
@@ -28,14 +27,17 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Bundle the ComfyUI source tree into the container image.
 COPY ComfyUI /ComfyUI
 
-# Install the template startup script at a dedicated runtime path.
-COPY start.sh /run.sh
+# Install the template bootstrap script at a dedicated runtime path.
+COPY start.sh /opt/template-start.sh
+
+# Install the wrapper startup script that preserves Runpod base services.
+COPY run.sh /run.sh
 
 # Make sure the startup script is executable at container launch.
-RUN chmod +x /run.sh
+RUN chmod +x /run.sh /opt/template-start.sh
 
 # Document the ComfyUI and Jupyter ports used by this template.
 EXPOSE 8188 8888
 
-# Run this template bootstrap flow via a dedicated startup script.
+# Start base services (including SSH) and then run template bootstrap.
 CMD ["/run.sh"]
