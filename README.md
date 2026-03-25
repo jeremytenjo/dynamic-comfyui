@@ -105,10 +105,10 @@ Optional helper script for versioned publishes:
 
 ```bash
 # Example: publish v1.2 to Docker Hub
-node scripts/publish-dockerhub.js v1.2 --username YOUR_DOCKER_USERNAME
+tsx scripts/publish-dockerhub.ts v1.2 --username YOUR_DOCKER_USERNAME
 
 # Also push :latest
-node scripts/publish-dockerhub.js v1.2 --username YOUR_DOCKER_USERNAME --latest
+tsx scripts/publish-dockerhub.ts v1.2 --username YOUR_DOCKER_USERNAME --latest
 
 # Fast path: auto-bump from your last published version and push :latest
 npm run publish:patch
