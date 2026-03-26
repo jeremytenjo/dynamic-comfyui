@@ -181,6 +181,8 @@ LORAS_DIR="$NETWORK_VOLUME/ComfyUI/models/loras"
 CHECKPOINTS_DIR="$NETWORK_VOLUME/ComfyUI/models/checkpoints"
 UPSCALE_DIR="$NETWORK_VOLUME/ComfyUI/models/upscale_models"
 LATENT_UPSCALE_DIR="$NETWORK_VOLUME/ComfyUI/models/latent_upscale_models"
+SAMS_DIR="$NETWORK_VOLUME/ComfyUI/models/sams"
+ULTRALYTICS_BBOX_DIR="$NETWORK_VOLUME/ComfyUI/models/ultralytics/bbox"
 
 echo "📦 Starting model downloads..."
 
@@ -197,6 +199,10 @@ download_model "https://huggingface.co/dci05049/spicy-sdxl/resolve/main/breast_s
 download_model "https://huggingface.co/dci05049/spicy-sdxl/resolve/main/bresat_sag_slider.safetensors" "$LORAS_DIR/bresat_sag_slider.safetensors"
 download_model "https://huggingface.co/dci05049/spicy-sdxl/resolve/main/waist_slider_xl.safetensors" "$LORAS_DIR/waist_slider_xl.safetensors"
 download_model "https://huggingface.co/dci05049/spicy-sdxl/resolve/main/leak_core.safetensors" "$LORAS_DIR/leak_core.safetensors"
+
+# Impact Pack defaults required by SAMLoader and UltralyticsDetectorProvider workflows.
+download_model "https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth" "$SAMS_DIR/sam_vit_b_01ec64.pth"
+download_model "https://huggingface.co/Bingsu/adetailer/resolve/main/face_yolov8m.pt" "$ULTRALYTICS_BBOX_DIR/face_yolov8m.pt"
 
 
 # Keep checking until no aria2c processes are running
