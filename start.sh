@@ -157,6 +157,37 @@ ensure_custom_node_repo "ComfyUI-Inpaint-CropAndStitch" "https://github.com/lque
 
 mark_stage "required_custom_nodes"
 
+ensure_nag_node_available() {
+    local nag_dir_primary="$CUSTOM_NODES_DIR/Comfyui-NAG-Aiorbust"
+    local nag_dir_fallback="$CUSTOM_NODES_DIR/ComfyUI-NAG"
+    local nag_primary_node_py="$nag_dir_primary/node.py"
+    local nag_fallback_node_py="$nag_dir_fallback/node.py"
+
+    if [ -f "$nag_primary_node_py" ] && grep -q "KSamplerWithNAG" "$nag_primary_node_py"; then
+        return 0
+    fi
+
+    if [ -f "$nag_fallback_node_py" ] && grep -q "KSamplerWithNAG" "$nag_fallback_node_py"; then
+        return 0
+    fi
+
+    echo "⚠️  NAG node class not found in existing custom_nodes. Attempting fallback clone..."
+    if [ ! -d "$nag_dir_fallback" ]; then
+        (cd "$CUSTOM_NODES_DIR" && git clone "https://github.com/ChenDarYen/ComfyUI-NAG.git" "ComfyUI-NAG")
+    fi
+
+    if [ -f "$nag_fallback_node_py" ] && grep -q "KSamplerWithNAG" "$nag_fallback_node_py"; then
+        echo "✅ Recovered NAG node via fallback clone."
+        return 0
+    fi
+
+    echo "❌ Required node 'KSamplerWithNAG' is unavailable after installation attempts."
+    echo "   Expected in: $nag_primary_node_py or $nag_fallback_node_py"
+    return 1
+}
+
+ensure_nag_node_available || exit 1
+
 install_custom_node_requirements() {
     local node_dir="$1"
     local requirements_file="$node_dir/requirements.txt"
@@ -169,6 +200,8 @@ install_custom_node_requirements() {
 
 # Fix missing 'gguf' import (required by ComfyUI-GGUF and transitively by ComfyUI-NAG).
 install_custom_node_requirements "$CUSTOM_NODES_DIR/ComfyUI-GGUF"
+# Fix missing 'ftfy' import required by ComfyUI-SAM3 (LoadSAM3Model).
+install_custom_node_requirements "$CUSTOM_NODES_DIR/ComfyUI-SAM3"
 
 pip install onnxruntime-gpu &
 
