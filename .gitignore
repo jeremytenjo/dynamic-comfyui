@@ -7,6 +7,7 @@ __pycache__/
 *.pyc
 
 z-image-premium
+aiorbust-z-image-premium
 
 # ComfyUI runtime/generated data
 ComfyUI/models/
