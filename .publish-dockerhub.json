@@ -1,6 +1,6 @@
 {
   "username": "tenjojeremy",
-  "image": "body-gen-comfyui",
+  "image": "avatary-content-generator",
   "platform": "linux/amd64",
   "context": ".",
   "latest": true,

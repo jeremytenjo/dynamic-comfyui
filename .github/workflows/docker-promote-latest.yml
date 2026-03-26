@@ -4,12 +4,12 @@ on:
   workflow_dispatch:
     inputs:
       image_name:
-        description: "Docker image name"
+        description: 'Docker image name'
         required: true
         type: string
-        default: body-gen-comfyui
+        default: avatary-content-generator
       source_tag:
-        description: "Existing tag to promote (example: v1.0.7)"
+        description: 'Existing tag to promote (example: v1.0.7)'
         required: true
         type: string
 

@@ -25,7 +25,7 @@ on:
         description: 'Docker image name'
         required: true
         type: string
-        default: body-gen-comfyui
+        default: avatary-content-generator
 
 jobs:
   dependency-check:
