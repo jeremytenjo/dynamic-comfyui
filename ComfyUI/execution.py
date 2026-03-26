@@ -999,6 +999,13 @@ def full_type_name(klass):
 async def validate_prompt(prompt_id, prompt, partial_execution_list: Union[list[str], None]):
     outputs = set()
     for x in prompt:
+        # Some clients submit workflow-shaped nodes with `type` instead of
+        # API-shaped nodes with `class_type`. Normalize this for compatibility.
+        if 'class_type' not in prompt[x] and isinstance(prompt[x], dict):
+            fallback_class_type = prompt[x].get('type')
+            if isinstance(fallback_class_type, str) and len(fallback_class_type) > 0:
+                prompt[x]['class_type'] = fallback_class_type
+
         if 'class_type' not in prompt[x]:
             error = {
                 "type": "invalid_prompt",
