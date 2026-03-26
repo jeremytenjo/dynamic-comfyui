@@ -19,30 +19,6 @@ else
     echo "curl is already installed"
 fi
 
-# Start SageAttention build in the background (optional)
-ENABLE_SAGE_ATTENTION="${ENABLE_SAGE_ATTENTION:-1}"
-SAGE_PID=""
-rm -f /tmp/sage_build_done /tmp/sage_build_failed
-if [ "$ENABLE_SAGE_ATTENTION" = "1" ]; then
-    echo "Starting SageAttention build..."
-    (
-        set -euo pipefail
-        export EXT_PARALLEL=4 NVCC_APPEND_FLAGS="--threads 8" MAX_JOBS=32
-        cd /tmp
-        rm -rf SageAttention
-        git clone --depth 1 https://github.com/thu-ml/SageAttention.git
-        cd SageAttention
-        git fetch --depth 1 origin 68de379
-        git checkout 68de379
-        pip install -e .
-        touch /tmp/sage_build_done
-    ) > /tmp/sage_build.log 2>&1 || touch /tmp/sage_build_failed &
-    SAGE_PID=$!
-    echo "SageAttention build started in background (PID: $SAGE_PID)"
-else
-    echo "Skipping SageAttention build (ENABLE_SAGE_ATTENTION=${ENABLE_SAGE_ATTENTION})."
-fi
-
 # Set the network volume path
 NETWORK_VOLUME="${NETWORK_VOLUME:-/workspace}"
 COMFYUI_PORT="${COMFYUI_PORT:-8188}"
@@ -360,43 +336,6 @@ done
 
 mark_stage "lora_rename"
 
-# Wait for SageAttention build to complete and only enable it if import works.
-SAGE_ATTENTION_READY=0
-if [ "$ENABLE_SAGE_ATTENTION" = "1" ]; then
-    echo "Waiting for SageAttention build to complete..."
-    sage_wait_elapsed=0
-    while true; do
-        if [ -f /tmp/sage_build_done ]; then
-            break
-        fi
-        if [ -f /tmp/sage_build_failed ]; then
-            break
-        fi
-        if [ -n "$SAGE_PID" ] && ! ps -p "$SAGE_PID" > /dev/null 2>&1; then
-            touch /tmp/sage_build_failed
-            break
-        fi
-        if [ $((sage_wait_elapsed % LOG_INTERVAL_S)) -eq 0 ]; then
-            echo "SageAttention build in progress..."
-        fi
-        sleep "$POLL_INTERVAL_S"
-        sage_wait_elapsed=$((sage_wait_elapsed + POLL_INTERVAL_S))
-    done
-
-    if [ -f /tmp/sage_build_done ] && python3 - <<'PY' >/dev/null 2>&1
-import sageattention  # noqa: F401
-PY
-    then
-        SAGE_ATTENTION_READY=1
-        echo "✅ SageAttention is installed and enabled."
-    else
-        echo "⚠️  SageAttention is unavailable. ComfyUI will start without --use-sage-attention."
-        echo "See /tmp/sage_build.log for details."
-    fi
-fi
-
-mark_stage "sageattention"
-
 # Wait for CUDA to become available before launching ComfyUI.
 wait_for_cuda_ready() {
     local timeout_s="${GPU_READY_TIMEOUT_S:-180}"
@@ -445,9 +384,6 @@ echo "Starting ComfyUI"
 
 COMFY_LOG_PATH="$NETWORK_VOLUME/comfyui_${RUNPOD_POD_ID}_nohup.log"
 COMFY_CMD=(python3 "$COMFYUI_DIR/main.py" --listen "0.0.0.0" --port "$COMFYUI_PORT")
-if [ "$SAGE_ATTENTION_READY" = "1" ]; then
-    COMFY_CMD+=(--use-sage-attention)
-fi
 
 nohup "${COMFY_CMD[@]}" > "$COMFY_LOG_PATH" 2>&1 &
 COMFY_PID=$!
