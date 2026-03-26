@@ -82,7 +82,19 @@ else
     # Keep ComfyUI state on the network volume and seed files once.
     mkdir -p "$COMFYUI_DIR"
     BOOTSTRAP_MARKER="$COMFYUI_DIR/.image_seeded"
-    if [ "${FORCE_SYNC_TEMPLATE:-0}" = "1" ]; then
+    if [ "${UPDATE_COMFYUI_FROM_IMAGE:-0}" = "1" ]; then
+        # Update ComfyUI code from the image while preserving persistent runtime data.
+        STARTUP_VOLUME_SEED_MODE="image-update"
+        rsync -a --delete \
+            --exclude "models/" \
+            --exclude "output/" \
+            --exclude "input/" \
+            --exclude "temp/" \
+            --exclude "user/" \
+            --exclude "custom_nodes/" \
+            /ComfyUI/ "$COMFYUI_DIR"/
+        touch "$BOOTSTRAP_MARKER"
+    elif [ "${FORCE_SYNC_TEMPLATE:-0}" = "1" ]; then
         STARTUP_VOLUME_SEED_MODE="force-sync"
         cp -an /ComfyUI/. "$COMFYUI_DIR"/
         touch "$BOOTSTRAP_MARKER"

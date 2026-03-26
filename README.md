@@ -151,6 +151,7 @@ Optional environment variables:
 - `LORAS_IDS_TO_DOWNLOAD`: comma-separated CivitAI model IDs
 - `NETWORK_VOLUME`: override persistent root path (default `/workspace`)
 - `FORCE_SYNC_TEMPLATE=1`: re-seed missing ComfyUI files from image into volume on startup
+- `UPDATE_COMFYUI_FROM_IMAGE=1`: update ComfyUI core files on the volume from image on startup (preserves `models`, `custom_nodes`, `user`, `input`, `output`, `temp`)
 
 ### 6) Deploy a Pod from the template
 
@@ -187,7 +188,7 @@ Optional environment variables:
 - Volume details page: https://console.runpod.io/user/storage/i8zzrcicig
 - If `/workspace` does not exist, runtime path changes to `/`.
 - On first boot with a mounted network volume, the bundled `/ComfyUI` files are seeded once into `/workspace/ComfyUI` and tracked with a marker file.
-- On later boots, the existing volume copy is reused to avoid expensive cross-filesystem moves.
+- On later boots, the existing volume copy is reused to avoid expensive cross-filesystem moves (unless `UPDATE_COMFYUI_FROM_IMAGE=1` is set).
 - Models and outputs are therefore stored under either:
   - `/workspace/ComfyUI/...` (persistent with network volume), or
   - `/ComfyUI/...` (ephemeral without network volume).
