@@ -189,6 +189,7 @@ Optional environment variables:
 - If `/workspace` does not exist, runtime path changes to `/`.
 - On first boot with a mounted network volume, the bundled `/ComfyUI` files are seeded once into `/workspace/ComfyUI` and tracked with a marker file.
 - On later boots, the existing volume copy is reused to avoid expensive cross-filesystem moves (unless `UPDATE_COMFYUI_FROM_IMAGE=1` is set).
+- On every boot with a mounted network volume, required workflow custom-node repos are ensured in `/workspace/ComfyUI/custom_nodes` if missing.
 - Models and outputs are therefore stored under either:
   - `/workspace/ComfyUI/...` (persistent with network volume), or
   - `/ComfyUI/...` (ephemeral without network volume).

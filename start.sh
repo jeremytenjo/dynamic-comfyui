@@ -112,6 +112,52 @@ CUSTOM_NODES_DIR="$COMFYUI_DIR/custom_nodes"
 
 mark_stage "comfyui_seed"
 
+ensure_custom_node_repo() {
+    local repo_dir_name="$1"
+    local repo_url="$2"
+    local target_dir="$CUSTOM_NODES_DIR/$repo_dir_name"
+    local image_repo_dir="/ComfyUI/custom_nodes/$repo_dir_name"
+
+    if [ -d "$target_dir" ]; then
+        return 0
+    fi
+
+    mkdir -p "$CUSTOM_NODES_DIR"
+
+    if [ -d "$image_repo_dir" ]; then
+        echo "📦 Adding missing custom node from image: $repo_dir_name"
+        cp -a "$image_repo_dir" "$target_dir"
+        return 0
+    fi
+
+    if [ -n "$repo_url" ]; then
+        echo "📥 Cloning missing custom node: $repo_dir_name"
+        (cd "$CUSTOM_NODES_DIR" && git clone "$repo_url" "$repo_dir_name")
+        return $?
+    fi
+
+    echo "⚠️  Missing custom node '$repo_dir_name' and no source available."
+    return 1
+}
+
+if [ "$NETWORK_VOLUME" != "/" ]; then
+    # Ensure critical workflow custom nodes exist on the network volume.
+    ensure_custom_node_repo "rgthree-comfy" "https://github.com/rgthree/rgthree-comfy.git"
+    ensure_custom_node_repo "ComfyUI-GlifNodes" "https://github.com/glifxyz/ComfyUI-GlifNodes.git"
+    ensure_custom_node_repo "ComfyUI-Impact-Pack" "https://github.com/ltdrdata/ComfyUI-Impact-Pack.git"
+    ensure_custom_node_repo "ComfyUI-Impact-Subpack" "https://github.com/ltdrdata/ComfyUI-Impact-Subpack.git"
+    ensure_custom_node_repo "cg-use-everywhere" "https://github.com/chrisgoringe/cg-use-everywhere.git"
+    ensure_custom_node_repo "ComfyUI_essentials" "https://github.com/cubiq/ComfyUI_essentials.git"
+    ensure_custom_node_repo "Comfyui-NAG-Aiorbust" "https://github.com/ai-robust/Comfyui-NAG.git"
+    ensure_custom_node_repo "comfyui-inspire-pack" "https://github.com/ltdrdata/ComfyUI-Inspire-Pack.git"
+    ensure_custom_node_repo "ComfyUI-SAM3" "https://github.com/PozzettiAndrea/ComfyUI-SAM3.git"
+    ensure_custom_node_repo "was-node-suite-comfyui" "https://github.com/WASasquatch/was-node-suite-comfyui.git"
+    ensure_custom_node_repo "ComfyUI-JoyCaption" "https://github.com/1038lab/ComfyUI-JoyCaption.git"
+    ensure_custom_node_repo "ComfyUI-GGUF" "https://github.com/city96/ComfyUI-GGUF.git"
+fi
+
+mark_stage "required_custom_nodes"
+
 pip install onnxruntime-gpu &
 
 
