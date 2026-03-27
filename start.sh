@@ -169,6 +169,7 @@ fi
 
 COMFYUI_DIR="$NETWORK_VOLUME/ComfyUI"
 WORKFLOW_DIR="$NETWORK_VOLUME/ComfyUI/user/default/workflows"
+FACE_SWAP_INPUT_DIR="$NETWORK_VOLUME/ComfyUI/face-swap-these"
 
 # Set the target directory
 CUSTOM_NODES_DIR="$NETWORK_VOLUME/ComfyUI/custom_nodes"
@@ -183,6 +184,9 @@ else
         cp -an /ComfyUI/. "$COMFYUI_DIR"/
     fi
 fi
+
+# Ensure workflow input folder exists for Load Image Batch in Head-Swap-V1.
+mkdir -p "$FACE_SWAP_INPUT_DIR"
 
 if [ "$INSTALL_ONNXRUNTIME_AT_STARTUP" = "1" ]; then
     (
