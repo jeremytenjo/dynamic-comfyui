@@ -7,7 +7,6 @@ export LD_PRELOAD="${TCMALLOC}"
 # Startup tuning knobs
 USE_SAGE_ATTENTION="${USE_SAGE_ATTENTION:-0}"
 INSTALL_ONNXRUNTIME_AT_STARTUP="${INSTALL_ONNXRUNTIME_AT_STARTUP:-0}"
-BLOCK_ON_MODEL_DOWNLOADS="${BLOCK_ON_MODEL_DOWNLOADS:-0}"
 
 BOOT_TIMING_LOG="/tmp/install_bootstrap_timing.log"
 if [ ! -f "$BOOT_TIMING_LOG" ]; then
@@ -313,6 +312,7 @@ download_model_id_bg() {
         fi
         exit $rc
     ) &
+    MODEL_ID_DOWNLOAD_PIDS+=($!)
 }
 
 # Define base paths
@@ -328,6 +328,7 @@ LATENT_UPSCALE_DIR="$NETWORK_VOLUME/ComfyUI/models/latent_upscale_models"
 echo "📦 Starting model downloads..."
 
 PRIMARY_MODEL_DOWNLOAD_PIDS=()
+MODEL_ID_DOWNLOAD_PIDS=()
 
 download_model_bg "https://huggingface.co/Comfy-Org/z_image/resolve/main/split_files/diffusion_models/z_image_bf16.safetensors" "$DIFFUSION_MODELS_DIR/z_image_bf16.safetensors"
 
@@ -383,9 +384,19 @@ done
 echo "Scheduled $download_count downloads in background"
 
 wait_for_all_model_downloads() {
+    local failed_downloads=0
     echo "Waiting for primary model downloads to complete..."
     for pid in "${PRIMARY_MODEL_DOWNLOAD_PIDS[@]}"; do
-        wait "$pid"
+        if ! wait "$pid"; then
+            failed_downloads=$((failed_downloads + 1))
+        fi
+    done
+
+    echo "Waiting for model-id downloads to complete..."
+    for pid in "${MODEL_ID_DOWNLOAD_PIDS[@]}"; do
+        if ! wait "$pid"; then
+            failed_downloads=$((failed_downloads + 1))
+        fi
     done
 
     echo "Waiting for all aria2 downloads to complete..."
@@ -393,7 +404,13 @@ wait_for_all_model_downloads() {
         echo "🔽 Model downloads still in progress..."
         sleep 5
     done
+    if [ "$failed_downloads" -gt 0 ]; then
+        echo "❌ $failed_downloads model download task(s) failed. See $TIMING_LOG for details."
+        log_timing "installation" "model_downloads" "failed" "$INSTALL_START_TS" "$(date +%s)" "0" "$TIMING_LOG"
+        return 1
+    fi
     echo "All model downloads completed"
+    return 0
 }
 
 # Ensure the file exists in the current directory before moving it
@@ -449,7 +466,9 @@ echo "cd $NETWORK_VOLUME" >> ~/.bashrc
 echo "Renaming loras downloaded as zip files to safetensors files"
 finalize_model_downloads() {
     local install_finish_start_ts=$(date +%s)
-    wait_for_all_model_downloads
+    if ! wait_for_all_model_downloads; then
+        return 1
+    fi
     cd "$LORAS_DIR"
     for file in *.zip; do
         [ -f "$file" ] || continue
@@ -461,11 +480,48 @@ finalize_model_downloads() {
     echo "Timing log available at: $TIMING_LOG"
 }
 
-if [ "$BLOCK_ON_MODEL_DOWNLOADS" = "1" ]; then
-    finalize_model_downloads
-else
-    echo "Not blocking startup on model downloads (BLOCK_ON_MODEL_DOWNLOADS=$BLOCK_ON_MODEL_DOWNLOADS)"
-    finalize_model_downloads > "$NETWORK_VOLUME/model_downloads.log" 2>&1 &
+if ! finalize_model_downloads; then
+    echo "Model installation failed; refusing to start ComfyUI."
+    exit 1
+fi
+
+ensure_required_text_encoders() {
+    local missing=0
+    local encoder_path=""
+    local -a required_text_encoders=(
+        "$TEXT_ENCODERS_DIR/qwen_3_4b.safetensors"
+        "$TEXT_ENCODERS_DIR/Z-Image-AbliteratedV1.f16.gguf"
+        "$TEXT_ENCODERS_DIR/Z-Image-AbliteratedV1.f16.safetensors"
+        "$TEXT_ENCODERS_DIR/Qwen3-4b-Z-Image-Engineer-V4-F16.gguf"
+    )
+
+    for encoder_path in "${required_text_encoders[@]}"; do
+        if [ ! -f "$encoder_path" ]; then
+            echo "❌ Missing text encoder: $encoder_path"
+            missing=$((missing + 1))
+            continue
+        fi
+
+        local size_bytes
+        size_bytes=$(stat -f%z "$encoder_path" 2>/dev/null || stat -c%s "$encoder_path" 2>/dev/null || echo 0)
+        if [ "$size_bytes" -lt 10485760 ]; then
+            echo "❌ Text encoder appears incomplete (<10MB): $encoder_path"
+            missing=$((missing + 1))
+        fi
+    done
+
+    if [ "$missing" -gt 0 ]; then
+        log_timing "preflight" "text_encoders" "failed_missing_or_incomplete" "$INSTALL_START_TS" "$(date +%s)" "0" "$TEXT_ENCODERS_DIR"
+        return 1
+    fi
+
+    log_timing "preflight" "text_encoders" "success" "$INSTALL_START_TS" "$(date +%s)" "0" "$TEXT_ENCODERS_DIR"
+    return 0
+}
+
+if ! ensure_required_text_encoders; then
+    echo "Text encoder preflight failed; refusing to start ComfyUI."
+    exit 1
 fi
 
 if [ "$USE_SAGE_ATTENTION" = "1" ]; then
