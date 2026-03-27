@@ -235,7 +235,6 @@ install_or_update_custom_node() {
 
 echo "Ensuring required custom nodes are installed..."
 install_or_update_custom_node "https://github.com/ltdrdata/was-node-suite-comfyui.git" "was-node-suite-comfyui"
-install_or_update_custom_node "https://github.com/1038lab/ComfyUI-JoyCaption.git" "ComfyUI-JoyCaption"
 install_or_update_custom_node "https://github.com/PozzettiAndrea/ComfyUI-SAM3.git" "ComfyUI-SAM3"
 install_or_update_custom_node "https://github.com/lquesada/ComfyUI-Inpaint-CropAndStitch.git" "ComfyUI-Inpaint-CropAndStitch"
 install_or_update_custom_node "https://github.com/city96/ComfyUI-GGUF.git" "ComfyUI-GGUF"
