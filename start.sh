@@ -55,9 +55,14 @@ WORKFLOW_DIR="$NETWORK_VOLUME/ComfyUI/user/default/workflows"
 CUSTOM_NODES_DIR="$NETWORK_VOLUME/ComfyUI/custom_nodes"
 
 if [ ! -d "$COMFYUI_DIR" ]; then
+    mkdir -p "$NETWORK_VOLUME"
     mv /ComfyUI "$COMFYUI_DIR"
 else
     echo "Directory already exists, skipping move."
+    # Ensure missing base folders from image are present on persisted volumes.
+    if [ -d /ComfyUI ]; then
+        cp -an /ComfyUI/. "$COMFYUI_DIR"/
+    fi
 fi
 
 pip install onnxruntime-gpu &
@@ -67,6 +72,7 @@ export change_preview_method="true"
 
 
 # Change to the directory
+mkdir -p "$CUSTOM_NODES_DIR"
 cd "$CUSTOM_NODES_DIR" || exit 1
 
 
@@ -134,7 +140,7 @@ download_model "https://huggingface.co/dci05049/z-image-lora/resolve/main/z_imag
 
 download_model "https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/text_encoders/qwen_3_4b.safetensors" "$TEXT_ENCODERS_DIR/qwen_3_4b.safetensors"
 
-download_model "hhttps://huggingface.co/BennyDaBall/Qwen3-4b-Z-Image-Turbo-AbliteratedV1/resolve/main/Z-Image-AbliteratedV1.f16.gguf" "$TEXT_ENCODERS_DIR/Z-Image-AbliteratedV1.f16.gguf"
+download_model "https://huggingface.co/BennyDaBall/Qwen3-4b-Z-Image-Turbo-AbliteratedV1/resolve/main/Z-Image-AbliteratedV1.f16.gguf" "$TEXT_ENCODERS_DIR/Z-Image-AbliteratedV1.f16.gguf"
 
 download_model "https://huggingface.co/aiorbust/z-image-nsfw/resolve/main/Z-Image-AbliteratedV1.f16.safetensors" "$TEXT_ENCODERS_DIR/Z-Image-AbliteratedV1.f16.safetensors"
 
@@ -296,4 +302,3 @@ nohup python3 "$NETWORK_VOLUME/ComfyUI/main.py" --listen --use-sage-attention > 
     fi
 
     sleep infinity
-fi
