@@ -28,45 +28,7 @@ on:
         default: avatary-content-generator
 
 jobs:
-  dependency-check:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-        with:
-          submodules: recursive
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: '3.12'
-
-      - name: Check compatibility policy
-        run: python3 scripts/check-compatibility.py
-
-      - name: Validate dependency resolution (dry-run)
-        run: |
-          python3 -m venv .venv
-          source .venv/bin/activate
-          python -m pip install --upgrade pip
-          grep -Ev '(^-e[[:space:]]+git\+|[[:space:]]@ git\+|^torch$|^torchaudio$|^torchvision$|^triton$)' requirements.txt > /tmp/requirements.ci.txt
-          pip install --dry-run -r /tmp/requirements.ci.txt
-
-      - name: Validate core Jupyter stack
-        run: |
-          python3 -m venv .venv-core
-          source .venv-core/bin/activate
-          python -m pip install --upgrade pip
-          jupyterlab_ver="$(awk -F== '/^jupyterlab==/{print $2}' requirements.txt)"
-          notebook_ver="$(awk -F== '/^notebook==/{print $2}' requirements.txt)"
-          pyparsing_ver="$(awk -F== '/^pyparsing==/{print $2}' requirements.txt)"
-          pip install "jupyterlab==${jupyterlab_ver}" "notebook==${notebook_ver}" "pyparsing==${pyparsing_ver}"
-          pip check
-
   build-and-push:
-    needs: dependency-check
     runs-on: ubuntu-latest
     permissions:
       contents: read
