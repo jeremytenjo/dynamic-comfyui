@@ -9,9 +9,7 @@ USE_SAGE_ATTENTION="${USE_SAGE_ATTENTION:-0}"
 INSTALL_ONNXRUNTIME_AT_STARTUP="${INSTALL_ONNXRUNTIME_AT_STARTUP:-0}"
 
 BOOT_TIMING_LOG="/tmp/install_bootstrap_timing.log"
-if [ ! -f "$BOOT_TIMING_LOG" ]; then
-    echo "timestamp_utc|phase|part|status|duration_s|bytes|source" > "$BOOT_TIMING_LOG"
-fi
+echo "filepath_or_filename, duration seconds/minutes, size" > "$BOOT_TIMING_LOG"
 
 log_boot_timing() {
     local phase="$1"
@@ -22,14 +20,32 @@ log_boot_timing() {
     local bytes="$6"
     local source="$7"
     local duration=$((end_ts - start_ts))
-    printf "%s|%s|%s|%s|%s|%s|%s\n" \
-        "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
-        "$phase" \
-        "$part" \
-        "$status" \
-        "$duration" \
-        "$bytes" \
-        "$source" >> "$BOOT_TIMING_LOG"
+    local duration_label
+    if [ "$duration" -lt 60 ]; then
+        duration_label="${duration}s"
+    else
+        duration_label="$(awk "BEGIN { printf \"%.2fm\", $duration/60 }")"
+    fi
+    local size_label
+    if [[ "$bytes" =~ ^[0-9]+$ ]]; then
+        if [ "$bytes" -ge 1073741824 ]; then
+            size_label="$(awk "BEGIN { printf \"%.2f GB\", $bytes/1073741824 }")"
+        elif [ "$bytes" -ge 1048576 ]; then
+            size_label="$(awk "BEGIN { printf \"%.2f MB\", $bytes/1048576 }")"
+        elif [ "$bytes" -ge 1024 ]; then
+            size_label="$(awk "BEGIN { printf \"%.2f KB\", $bytes/1024 }")"
+        else
+            size_label="${bytes} B"
+        fi
+    else
+        size_label="$bytes"
+    fi
+    local item_label
+    item_label="$part"
+    if [[ "$source" == /* ]]; then
+        item_label="$source"
+    fi
+    printf "%s, %s, %s\n" "$item_label" "$duration_label" "$size_label" >> "$BOOT_TIMING_LOG"
 }
 
 
@@ -108,9 +124,7 @@ fi
 TIMING_LOG="$NETWORK_VOLUME/install_timing.log"
 INSTALL_START_TS=$(date +%s)
 mkdir -p "$NETWORK_VOLUME"
-if [ ! -f "$TIMING_LOG" ]; then
-    echo "timestamp_utc|phase|part|status|duration_s|bytes|source" > "$TIMING_LOG"
-fi
+echo "filepath_or_filename, duration seconds/minutes, size" > "$TIMING_LOG"
 
 log_timing() {
     local phase="$1"
@@ -121,14 +135,32 @@ log_timing() {
     local bytes="$6"
     local source="$7"
     local duration=$((end_ts - start_ts))
-    printf "%s|%s|%s|%s|%s|%s|%s\n" \
-        "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
-        "$phase" \
-        "$part" \
-        "$status" \
-        "$duration" \
-        "$bytes" \
-        "$source" >> "$TIMING_LOG"
+    local duration_label
+    if [ "$duration" -lt 60 ]; then
+        duration_label="${duration}s"
+    else
+        duration_label="$(awk "BEGIN { printf \"%.2fm\", $duration/60 }")"
+    fi
+    local size_label
+    if [[ "$bytes" =~ ^[0-9]+$ ]]; then
+        if [ "$bytes" -ge 1073741824 ]; then
+            size_label="$(awk "BEGIN { printf \"%.2f GB\", $bytes/1073741824 }")"
+        elif [ "$bytes" -ge 1048576 ]; then
+            size_label="$(awk "BEGIN { printf \"%.2f MB\", $bytes/1048576 }")"
+        elif [ "$bytes" -ge 1024 ]; then
+            size_label="$(awk "BEGIN { printf \"%.2f KB\", $bytes/1024 }")"
+        else
+            size_label="${bytes} B"
+        fi
+    else
+        size_label="$bytes"
+    fi
+    local item_label
+    item_label="$part"
+    if [[ "$source" == /* ]]; then
+        item_label="$source"
+    fi
+    printf "%s, %s, %s\n" "$item_label" "$duration_label" "$size_label" >> "$TIMING_LOG"
 }
 
 if [ -f "$BOOT_TIMING_LOG" ]; then
