@@ -16,11 +16,11 @@ URL="http://127.0.0.1:8188"
 
 prepare_network_volume_and_start_jupyter
 
+export INSTALL_START_TS
 INSTALL_START_TS=$(date +%s)
 mkdir -p "$NETWORK_VOLUME"
 
-apply_flash_attn_runtime_hotfix
-
+apply_flash_attn_runtime_hotfix 
 
 COMFYUI_DIR="$NETWORK_VOLUME/ComfyUI"
 CUSTOM_NODES_DIR="$NETWORK_VOLUME/ComfyUI/custom_nodes"
@@ -70,14 +70,14 @@ require_custom_node "comfyui_essentials" "ComfyUI_essentials" "1.1.0"
 DIFFUSION_MODELS_DIR="$NETWORK_VOLUME/ComfyUI/models/diffusion_models"
 TEXT_ENCODERS_DIR="$NETWORK_VOLUME/ComfyUI/models/text_encoders"
 VAE_DIR="$NETWORK_VOLUME/ComfyUI/models/vae"
-LORAS_DIR="$NETWORK_VOLUME/ComfyUI/models/loras"
+export LORAS_DIR="$NETWORK_VOLUME/ComfyUI/models/loras"
 SEEDVR2_DIR="$NETWORK_VOLUME/ComfyUI/models/SEEDVR2"
 SAM3_DIR="$NETWORK_VOLUME/ComfyUI/models/sam3"
 
 echo "📦 Starting model downloads..."
 
-PRIMARY_MODEL_DOWNLOAD_PIDS=()
-PRIMARY_MODEL_DOWNLOAD_LABELS=()
+export PRIMARY_MODEL_DOWNLOAD_PIDS=()
+export PRIMARY_MODEL_DOWNLOAD_LABELS=()
 
 # Models
 download_model_bg "https://huggingface.co/avatary-ai/files/resolve/main/ae.safetensors" "$VAE_DIR/ae.safetensors"
