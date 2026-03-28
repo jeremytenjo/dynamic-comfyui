@@ -88,7 +88,7 @@ jobs:
               return (int(match.group(1)), int(match.group(2)), int(match.group(3)))
 
           def format_semver(parts):
-              return f"v{parts[0]}.{parts[1]}.{parts[2]}"
+              return f"{parts[0]}.{parts[1]}.{parts[2]}"
 
           def bump(parts, kind: str):
               major, minor, patch = parts
@@ -153,7 +153,7 @@ jobs:
                       base_source = f"package.json:{format_semver(base_parts)}"
                   else:
                       base_parts = (0, 0, 0)
-                      base_source = "fallback:v0.0.0"
+                      base_source = "fallback:0.0.0"
 
           next_parts = bump(base_parts, bump_type)
           next_tag = format_semver(next_parts)
