@@ -15,7 +15,7 @@ RUN apt-get update --yes && \
 COPY ComfyUI/requirements.txt /tmp/requirements.txt
 
 RUN pip install --no-cache-dir --upgrade pip && \
-    grep -v "SageAttention.git" /tmp/requirements.txt > /tmp/requirements.image.txt && \
+    cp /tmp/requirements.txt /tmp/requirements.image.txt && \
     sed -i -E '/^(torch|torchaudio|torchvision|triton)(==.*)?$/d' /tmp/requirements.image.txt && \
     sed -i -E '/^SQLAlchemy(==.*)?$/d' /tmp/requirements.image.txt && \
     sed -i -E '/^(cuda-bindings|cuda-pathfinder)(==.*)?$/d' /tmp/requirements.image.txt && \

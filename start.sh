@@ -5,7 +5,6 @@ TCMALLOC="$(ldconfig -p | grep -Po "libtcmalloc.so.\d" | head -n 1)"
 export LD_PRELOAD="${TCMALLOC}"
 
 # Startup tuning knobs
-USE_SAGE_ATTENTION="${USE_SAGE_ATTENTION:-0}"
 INSTALL_ONNXRUNTIME_AT_STARTUP="${INSTALL_ONNXRUNTIME_AT_STARTUP:-0}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -30,29 +29,6 @@ else
     echo "curl is already installed"
     curl_now_ts=$(date +%s)
     log_boot_timing "package_install" "curl" "skipped_existing" "$curl_now_ts" "$curl_now_ts" "0" "apt-get"
-fi
-
-SAGE_PID=""
-SAGE_BUILD_START_TS=""
-if [ "$USE_SAGE_ATTENTION" = "1" ]; then
-    # Start SageAttention build in the background
-    SAGE_BUILD_START_TS=$(date +%s)
-    echo "Starting SageAttention build..."
-    (
-        export EXT_PARALLEL=4 NVCC_APPEND_FLAGS="--threads 8" MAX_JOBS=32
-        cd /tmp
-        git clone https://github.com/thu-ml/SageAttention.git
-        cd SageAttention
-        git reset --hard 68de379
-        pip install -e .
-        echo "SageAttention build completed" > /tmp/sage_build_done
-    ) > /tmp/sage_build.log 2>&1 &
-    SAGE_PID=$!
-    echo "SageAttention build started in background (PID: $SAGE_PID)"
-else
-    echo "Skipping SageAttention build (USE_SAGE_ATTENTION=$USE_SAGE_ATTENTION)"
-    sage_now_ts=$(date +%s)
-    log_boot_timing "build" "sageattention" "skipped_disabled" "$sage_now_ts" "$sage_now_ts" "0" "env:USE_SAGE_ATTENTION"
 fi
 
 # Set the network volume path
@@ -288,40 +264,10 @@ if ! ensure_required_vae_models; then
     exit 1
 fi
 
-if [ "$USE_SAGE_ATTENTION" = "1" ]; then
-    # Wait for SageAttention build to complete
-    echo "Waiting for SageAttention build to complete..."
-    sage_status="failed"
-    while ! [ -f /tmp/sage_build_done ]; do
-        if ps -p $SAGE_PID > /dev/null 2>&1; then
-            echo "⚙️  SageAttention build in progress, this may take up to 5 minutes."
-            sleep 5
-        else
-            # Process finished but no completion marker - check if it failed
-            if ! [ -f /tmp/sage_build_done ]; then
-                echo "⚠️  SageAttention build process ended unexpectedly. Check logs at /tmp/sage_build.log"
-                echo "Continuing with ComfyUI startup..."
-                sage_status="failed"
-                break
-            fi
-        fi
-    done
-
-    if [ -f /tmp/sage_build_done ]; then
-        echo "✅ SageAttention build completed successfully!"
-        sage_status="success"
-    fi
-    sage_end_ts=$(date +%s)
-    log_timing "build" "sageattention" "$sage_status" "$SAGE_BUILD_START_TS" "$sage_end_ts" "0" "/tmp/sage_build.log"
-fi
-
 # Start ComfyUI
 
 echo "Starting ComfyUI"
 COMFY_ARGS=(--listen --enable-manager)
-if [ "$USE_SAGE_ATTENTION" = "1" ]; then
-    COMFY_ARGS+=(--use-sage-attention)
-fi
 
 nohup python3 "$NETWORK_VOLUME/ComfyUI/main.py" "${COMFY_ARGS[@]}" > "$NETWORK_VOLUME/comfyui_${RUNPOD_POD_ID}_nohup.log" 2>&1 &
 
