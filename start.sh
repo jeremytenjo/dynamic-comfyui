@@ -757,7 +757,7 @@ fi
 # Start ComfyUI
 
 echo "Starting ComfyUI"
-COMFY_ARGS=(--listen)
+COMFY_ARGS=(--listen --enable-manager)
 if [ "$USE_SAGE_ATTENTION" = "1" ]; then
     COMFY_ARGS+=(--use-sage-attention)
 fi
