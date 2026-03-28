@@ -260,55 +260,82 @@ export change_preview_method="true"
 mkdir -p "$CUSTOM_NODES_DIR"
 cd "$CUSTOM_NODES_DIR" || exit 1
 
-install_or_update_custom_node() {
-    local repo_url="$1"
+install_or_update_custom_node_cnr() {
+    local cnr_id="$1"
     local repo_dir="$2"
-    local repo_ref="$3"
+    local cnr_version="$3"
     local node_path="$CUSTOM_NODES_DIR/$repo_dir"
     local start_ts
     local end_ts
     local rc=0
+    local archive_name=""
+    local archive_path=""
+    local metadata_json=""
+    local download_url=""
+    local resolved_version=""
     start_ts=$(date +%s)
 
-    if [ -d "$node_path/.git" ]; then
-        if [ -n "$repo_ref" ]; then
-            echo "Updating custom node: $repo_dir (pinned ref: $repo_ref)"
-            git -C "$node_path" fetch --tags --prune origin || rc=$?
-            if [ $rc -eq 0 ]; then
-                git -C "$node_path" checkout -q "$repo_ref" || rc=$?
-            fi
-        else
-            echo "Updating custom node: $repo_dir"
-            git -C "$node_path" pull --ff-only || rc=$?
-        fi
+    echo "Installing custom node from CNR: $repo_dir ($cnr_id@$cnr_version)"
+
+    metadata_json="$(curl -fsSL "https://api.comfy.org/nodes/${cnr_id}/install?version=${cnr_version}")" || rc=$?
+    if [ $rc -ne 0 ]; then
         end_ts=$(date +%s)
-        if [ $rc -eq 0 ]; then
-            log_timing "custom_node_install" "$repo_dir" "updated" "$start_ts" "$end_ts" "0" "$repo_url"
-        else
-            log_timing "custom_node_install" "$repo_dir" "update_failed" "$start_ts" "$end_ts" "0" "$repo_url"
-            return $rc
-        fi
-    else
-        if [ -n "$repo_ref" ]; then
-            echo "Installing custom node: $repo_dir (pinned ref: $repo_ref)"
-            git clone "$repo_url" "$node_path" || rc=$?
-            if [ $rc -eq 0 ]; then
-                git -C "$node_path" checkout -q "$repo_ref" || rc=$?
-            fi
-        else
-            echo "Installing custom node: $repo_dir"
-            git clone --depth 1 "$repo_url" "$node_path" || rc=$?
-        fi
+        log_timing "custom_node_install" "$repo_dir" "install_failed" "$start_ts" "$end_ts" "0" "cnr:${cnr_id}@${cnr_version}"
+        return $rc
+    fi
+
+    download_url="$(printf '%s' "$metadata_json" | python3 -c 'import json,sys; print((json.load(sys.stdin).get("downloadUrl") or "").strip())')"
+    resolved_version="$(printf '%s' "$metadata_json" | python3 -c 'import json,sys; print((json.load(sys.stdin).get("version") or "").strip())')"
+    if [ -z "$download_url" ] || [ -z "$resolved_version" ]; then
         end_ts=$(date +%s)
-        if [ $rc -eq 0 ]; then
-            log_timing "custom_node_install" "$repo_dir" "installed" "$start_ts" "$end_ts" "0" "$repo_url"
-        else
-            log_timing "custom_node_install" "$repo_dir" "install_failed" "$start_ts" "$end_ts" "0" "$repo_url"
-            return $rc
+        log_timing "custom_node_install" "$repo_dir" "install_failed_invalid_metadata" "$start_ts" "$end_ts" "0" "cnr:${cnr_id}@${cnr_version}"
+        return 1
+    fi
+
+    if [ -f "$node_path/.cnr-version" ] && [ -d "$node_path" ]; then
+        local installed_version
+        installed_version="$(cat "$node_path/.cnr-version" 2>/dev/null || true)"
+        if [ "$installed_version" = "$resolved_version" ]; then
+            end_ts=$(date +%s)
+            log_timing "custom_node_install" "$repo_dir" "skipped_existing_version" "$start_ts" "$end_ts" "0" "cnr:${cnr_id}@${resolved_version}"
+            return 0
         fi
     fi
 
-    # Install custom node dependencies when provided by the node repo.
+    archive_name="CNR_${repo_dir}_$(date +%s).zip"
+    archive_path="/tmp/${archive_name}"
+    rm -f "$archive_path"
+    aria2c -x 8 -s 8 -k 1M --continue=true -d /tmp -o "$archive_name" "$download_url" || rc=$?
+    if [ $rc -ne 0 ]; then
+        end_ts=$(date +%s)
+        log_timing "custom_node_install" "$repo_dir" "install_failed_download" "$start_ts" "$end_ts" "0" "$download_url"
+        return $rc
+    fi
+
+    rm -rf "$node_path"
+    mkdir -p "$node_path"
+    python3 - "$archive_path" "$node_path" <<'PY'
+import sys
+import zipfile
+
+archive_path = sys.argv[1]
+target_dir = sys.argv[2]
+with zipfile.ZipFile(archive_path, "r") as zf:
+    zf.extractall(target_dir)
+PY
+    rc=$?
+    rm -f "$archive_path"
+    if [ $rc -ne 0 ]; then
+        end_ts=$(date +%s)
+        log_timing "custom_node_install" "$repo_dir" "install_failed_extract" "$start_ts" "$end_ts" "0" "cnr:${cnr_id}@${resolved_version}"
+        return $rc
+    fi
+
+    echo "$resolved_version" > "$node_path/.cnr-version"
+    end_ts=$(date +%s)
+    log_timing "custom_node_install" "$repo_dir" "installed" "$start_ts" "$end_ts" "0" "cnr:${cnr_id}@${resolved_version}"
+
+    # Install custom node dependencies when provided by the node pack.
     if [ -f "$node_path/requirements.txt" ]; then
         local dep_start_ts
         local dep_end_ts
@@ -333,28 +360,28 @@ install_or_update_custom_node() {
 
 echo "Ensuring required custom nodes are installed..."
 require_custom_node() {
-    local repo_url="$1"
+    local cnr_id="$1"
     local repo_dir="$2"
-    local repo_ref="$3"
-    if ! install_or_update_custom_node "$repo_url" "$repo_dir" "$repo_ref"; then
+    local cnr_version="$3"
+    if ! install_or_update_custom_node_cnr "$cnr_id" "$repo_dir" "$cnr_version"; then
         local end_ts
         end_ts=$(date +%s)
         echo "❌ Required custom node install/update failed: $repo_dir"
-        log_timing "custom_node_install" "$repo_dir" "required_failed_abort" "$INSTALL_START_TS" "$end_ts" "0" "$repo_url"
+        log_timing "custom_node_install" "$repo_dir" "required_failed_abort" "$INSTALL_START_TS" "$end_ts" "0" "cnr:${cnr_id}@${cnr_version}"
         exit 1
     fi
 }
 
 # Custom Nodes
-require_custom_node "https://github.com/ltdrdata/was-node-suite-comfyui.git" "was-node-suite-comfyui" "v3.0.1"
-require_custom_node "https://github.com/ltdrdata/ComfyUI-Manager.git" "ComfyUI-Manager" "v4.1"
-require_custom_node "https://github.com/1038lab/ComfyUI-RMBG.git" "ComfyUI-RMBG" "v3.0.0"
-require_custom_node "https://github.com/lquesada/ComfyUI-Inpaint-CropAndStitch.git" "ComfyUI-Inpaint-CropAndStitch" "v3.0.10"
-require_custom_node "https://github.com/city96/ComfyUI-GGUF.git" "ComfyUI-GGUF" "v1.1.10"
-require_custom_node "https://github.com/kijai/ComfyUI-KJNodes.git" "ComfyUI-KJNodes" "v1.3.6"
-require_custom_node "https://github.com/yolain/ComfyUI-Easy-Use.git" "ComfyUI-Easy-Use" "v1.3.6"
-require_custom_node "https://github.com/numz/ComfyUI-SeedVR2_VideoUpscaler.git" "ComfyUI-SeedVR2_VideoUpscaler" "v2.5.22"
-require_custom_node "https://github.com/cubiq/ComfyUI_essentials.git" "ComfyUI_essentials" "v1.1.0"
+require_custom_node "was-ns" "was-node-suite-comfyui" "3.0.1"
+require_custom_node "comfyui-manager" "ComfyUI-Manager" "3.0.1"
+require_custom_node "comfyui-rmbg" "ComfyUI-RMBG" "3.0.0"
+require_custom_node "comfyui-inpaint-cropandstitch" "ComfyUI-Inpaint-CropAndStitch" "3.0.10"
+require_custom_node "ComfyUI-GGUF" "ComfyUI-GGUF" "1.1.10"
+require_custom_node "comfyui-kjnodes" "ComfyUI-KJNodes" "1.3.6"
+require_custom_node "comfyui-easy-use" "ComfyUI-Easy-Use" "1.3.6"
+require_custom_node "seedvr2_videoupscaler" "ComfyUI-SeedVR2_VideoUpscaler" "2.5.22"
+require_custom_node "comfyui_essentials" "ComfyUI_essentials" "1.1.0"
 
 
 # Function to download a model using huggingface-cli
