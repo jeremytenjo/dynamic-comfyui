@@ -427,7 +427,7 @@ download_model_bg "https://huggingface.co/Comfy-Org/z_image/resolve/main/split_f
 
 download_model_bg "https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/diffusion_models/z_image_turbo_bf16.safetensors" "$DIFFUSION_MODELS_DIR/z_image_turbo.safetensors"
 
-download_model_bg "https://huggingface.co/aiorbust/z-image-nsfw/resolve/main/z-image-turbo-nsfw.safetensors" "$DIFFUSION_MODELS_DIR/z-image-turbo-nsfw.safetensors"
+download_model_bg "https://huggingface.co/jeremyhola/LORAs/resolve/main/aiorbust/nsfw/z_image_turbo.safetensors" "$DIFFUSION_MODELS_DIR/z-image-turbo-nsfw.safetensors"
 
 download_model_bg "https://huggingface.co/dci05049/z-image-lora/resolve/main/instagram_zimageturbo.safetensors" "$LORAS_DIR/instagram_zimageturbo.safetensors"
 
@@ -439,7 +439,7 @@ download_model_bg "https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/s
 
 download_model_bg "https://huggingface.co/BennyDaBall/Qwen3-4b-Z-Image-Turbo-AbliteratedV1/resolve/main/Z-Image-AbliteratedV1.f16.gguf" "$TEXT_ENCODERS_DIR/Z-Image-AbliteratedV1.f16.gguf"
 
-download_model_bg "https://huggingface.co/aiorbust/z-image-nsfw/resolve/main/Z-Image-AbliteratedV1.f16.safetensors" "$TEXT_ENCODERS_DIR/Z-Image-AbliteratedV1.f16.safetensors"
+download_model_bg "https://huggingface.co/jeremyhola/LORAs/resolve/main/aiorbust/nsfw/Z-Image-AbliteratedV1.f16.safetensors" "$TEXT_ENCODERS_DIR/Z-Image-AbliteratedV1.f16.safetensors"
 
 download_model_bg "https://huggingface.co/BennyDaBall/Qwen3-4b-Z-Image-Engineer-V4/resolve/main/Qwen3-4b-Z-Image-Engineer-V4-F16.gguf" "$TEXT_ENCODERS_DIR/Qwen3-4b-Z-Image-Engineer-V4-F16.gguf"
 
