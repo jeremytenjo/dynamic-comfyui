@@ -41,44 +41,8 @@ PY
 
 normalize_cuda_visibility
 
-BOOT_TIMING_LOG="/tmp/install_bootstrap_timing.log"
-echo "filepath_or_filename, duration seconds/minutes, size" > "$BOOT_TIMING_LOG"
-
 log_boot_timing() {
-    local phase="$1"
-    local part="$2"
-    local status="$3"
-    local start_ts="$4"
-    local end_ts="$5"
-    local bytes="$6"
-    local source="$7"
-    local duration=$((end_ts - start_ts))
-    local duration_label
-    if [ "$duration" -lt 60 ]; then
-        duration_label="${duration}s"
-    else
-        duration_label="$(awk "BEGIN { printf \"%.2fm\", $duration/60 }")"
-    fi
-    local size_label
-    if [[ "$bytes" =~ ^[0-9]+$ ]]; then
-        if [ "$bytes" -ge 1073741824 ]; then
-            size_label="$(awk "BEGIN { printf \"%.2f GB\", $bytes/1073741824 }")"
-        elif [ "$bytes" -ge 1048576 ]; then
-            size_label="$(awk "BEGIN { printf \"%.2f MB\", $bytes/1048576 }")"
-        elif [ "$bytes" -ge 1024 ]; then
-            size_label="$(awk "BEGIN { printf \"%.2f KB\", $bytes/1024 }")"
-        else
-            size_label="${bytes} B"
-        fi
-    else
-        size_label="$bytes"
-    fi
-    local item_label
-    item_label="$part"
-    if [[ "$source" == /* ]]; then
-        item_label="$source"
-    fi
-    printf "%s, %s, %s\n" "$item_label" "$duration_label" "$size_label" >> "$BOOT_TIMING_LOG"
+    :
 }
 
 
@@ -154,51 +118,12 @@ else
     jupyter-lab --ip=0.0.0.0 --allow-root --no-browser --NotebookApp.token='' --NotebookApp.password='' --ServerApp.allow_origin='*' --ServerApp.allow_credentials=True --notebook-dir=/workspace &
 fi
 
-TIMING_LOG="$NETWORK_VOLUME/install_timing.log"
 INSTALL_START_TS=$(date +%s)
 mkdir -p "$NETWORK_VOLUME"
-echo "filepath_or_filename, duration seconds/minutes, size" > "$TIMING_LOG"
 
 log_timing() {
-    local phase="$1"
-    local part="$2"
-    local status="$3"
-    local start_ts="$4"
-    local end_ts="$5"
-    local bytes="$6"
-    local source="$7"
-    local duration=$((end_ts - start_ts))
-    local duration_label
-    if [ "$duration" -lt 60 ]; then
-        duration_label="${duration}s"
-    else
-        duration_label="$(awk "BEGIN { printf \"%.2fm\", $duration/60 }")"
-    fi
-    local size_label
-    if [[ "$bytes" =~ ^[0-9]+$ ]]; then
-        if [ "$bytes" -ge 1073741824 ]; then
-            size_label="$(awk "BEGIN { printf \"%.2f GB\", $bytes/1073741824 }")"
-        elif [ "$bytes" -ge 1048576 ]; then
-            size_label="$(awk "BEGIN { printf \"%.2f MB\", $bytes/1048576 }")"
-        elif [ "$bytes" -ge 1024 ]; then
-            size_label="$(awk "BEGIN { printf \"%.2f KB\", $bytes/1024 }")"
-        else
-            size_label="${bytes} B"
-        fi
-    else
-        size_label="$bytes"
-    fi
-    local item_label
-    item_label="$part"
-    if [[ "$source" == /* ]]; then
-        item_label="$source"
-    fi
-    printf "%s, %s, %s\n" "$item_label" "$duration_label" "$size_label" >> "$TIMING_LOG"
+    :
 }
-
-if [ -f "$BOOT_TIMING_LOG" ]; then
-    tail -n +2 "$BOOT_TIMING_LOG" >> "$TIMING_LOG"
-fi
 
 COMFYUI_DIR="$NETWORK_VOLUME/ComfyUI"
 WORKFLOW_DIR="$NETWORK_VOLUME/ComfyUI/user/default/workflows"
@@ -562,13 +487,13 @@ wait_for_all_model_downloads() {
         sleep 5
     done
     if [ "$failed_downloads" -gt 0 ]; then
-        echo "❌ $failed_downloads model download task(s) failed. See $TIMING_LOG for details."
+        echo "❌ $failed_downloads model download task(s) failed."
         echo "Failed model download items:"
         local failed_item
         for failed_item in "${failed_items[@]}"; do
             echo " - $failed_item"
         done
-        log_timing "installation" "model_downloads" "failed" "$INSTALL_START_TS" "$(date +%s)" "0" "$TIMING_LOG"
+        log_timing "installation" "model_downloads" "failed" "$INSTALL_START_TS" "$(date +%s)" "0" "model_downloads"
         return 1
     fi
     echo "All model downloads completed"
@@ -671,9 +596,8 @@ finalize_model_downloads() {
         mv "$file" "${file%.zip}.safetensors"
     done
     local install_end_ts=$(date +%s)
-    log_timing "installation" "all_downloads" "completed" "$INSTALL_START_TS" "$install_end_ts" "0" "$TIMING_LOG"
-    log_timing "installation" "finalize_step" "completed" "$install_finish_start_ts" "$install_end_ts" "0" "$TIMING_LOG"
-    echo "Timing log available at: $TIMING_LOG"
+    log_timing "installation" "all_downloads" "completed" "$INSTALL_START_TS" "$install_end_ts" "0" "all_downloads"
+    log_timing "installation" "finalize_step" "completed" "$install_finish_start_ts" "$install_end_ts" "0" "finalize_step"
 }
 
 if ! finalize_model_downloads; then
