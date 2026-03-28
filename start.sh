@@ -498,7 +498,7 @@ download_model_bg "https://huggingface.co/avatary-ai/files/resolve/main/ae.safet
 
 download_model_bg "https://huggingface.co/avatary-ai/files/resolve/main/z_image_vae.safetensors" "$VAE_DIR/z_image_vae.safetensors"
 
-download_model_bg "https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/text_encoders/qwen_3_4b.safetensors" "$TEXT_ENCODERS_DIR/qwen_3_4b.safetensors"
+download_model_bg "https://huggingface.co/avatary-ai/files/resolve/main/qwen_3_4b.safetensors" "$TEXT_ENCODERS_DIR/qwen_3_4b.safetensors"
 
 download_model_bg "https://huggingface.co/BennyDaBall/Qwen3-4b-Z-Image-Turbo-AbliteratedV1/resolve/main/Z-Image-AbliteratedV1.f16.gguf" "$TEXT_ENCODERS_DIR/Z-Image-AbliteratedV1.f16.gguf"
 
@@ -799,6 +799,33 @@ if ! ensure_manager_runtime_ready; then
     echo "ComfyUI manager runtime setup failed; refusing to start ComfyUI with --enable-manager."
     exit 1
 fi
+
+install_transformers_flash_attn_hotfix() {
+    local hotfix_dir="/tmp/comfy_python_hotfixes"
+    local hotfix_file="$hotfix_dir/sitecustomize.py"
+    mkdir -p "$hotfix_dir"
+
+    # Work around transformers builds that can raise KeyError: 'flash_attn'
+    # when optional flash-attention support is probed by custom nodes.
+    cat > "$hotfix_file" <<'PY'
+try:
+    from transformers.utils import import_utils as _iu  # type: ignore
+    _mapping = getattr(_iu, "PACKAGE_DISTRIBUTION_MAPPING", None)
+    if isinstance(_mapping, dict) and "flash_attn" not in _mapping:
+        _mapping["flash_attn"] = ["flash-attn", "flash_attn"]
+except Exception:
+    pass
+PY
+
+    if [ -n "${PYTHONPATH:-}" ]; then
+        export PYTHONPATH="$hotfix_dir:$PYTHONPATH"
+    else
+        export PYTHONPATH="$hotfix_dir"
+    fi
+    echo "Applied Python runtime hotfix for transformers flash_attn mapping."
+}
+
+install_transformers_flash_attn_hotfix
 
 if [ "$USE_SAGE_ATTENTION" = "1" ]; then
     # Wait for SageAttention build to complete
