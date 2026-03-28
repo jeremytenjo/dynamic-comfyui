@@ -14,7 +14,7 @@ ComfyUI/temp/
 ComfyUI/user/
 
 # Nested repo metadata from custom nodes
-**/.git/
+ComfyUI/**/.git/
 
 # Logs
 *.log
@@ -22,10 +22,6 @@ ComfyUI/user/
 
 # macOS
 .DS_Store
-
-# Git
-.git
-.github
 
 # Editor
 .vscode

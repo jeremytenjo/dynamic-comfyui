@@ -1,0 +1,59 @@
+name: Runpod Smoke (GPU)
+
+on:
+  workflow_dispatch:
+    inputs:
+      template_id:
+        description: "Runpod template ID"
+        required: true
+        type: string
+      image_name:
+        description: "Optional image override (example: user/image:sha-abc123)"
+        required: false
+        type: string
+      gpu_type_id:
+        description: "GPU type ID"
+        required: true
+        type: string
+        default: "NVIDIA L40S"
+      gpu_count:
+        description: "GPU count"
+        required: true
+        type: string
+        default: "1"
+      cloud_type:
+        description: "Cloud type"
+        required: true
+        type: choice
+        options:
+          - SECURE
+          - COMMUNITY
+        default: SECURE
+      keep_pod:
+        description: "Keep pod after test"
+        required: true
+        type: boolean
+        default: false
+
+jobs:
+  smoke-runpod:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Enable script
+        run: chmod +x scripts/smoke-runpod.sh
+
+      - name: Run GPU smoke on Runpod
+        env:
+          RUNPOD_API_KEY: ${{ secrets.RUNPOD_API_KEY }}
+          RUNPOD_TEMPLATE_ID: ${{ inputs.template_id }}
+          RUNPOD_IMAGE_NAME: ${{ inputs.image_name }}
+          RUNPOD_GPU_TYPE_ID: ${{ inputs.gpu_type_id }}
+          RUNPOD_GPU_COUNT: ${{ inputs.gpu_count }}
+          RUNPOD_CLOUD_TYPE: ${{ inputs.cloud_type }}
+          RUNPOD_KEEP_POD: ${{ inputs.keep_pod }}
+        run: bash scripts/smoke-runpod.sh

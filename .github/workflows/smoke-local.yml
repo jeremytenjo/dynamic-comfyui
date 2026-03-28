@@ -1,0 +1,40 @@
+name: Local Smoke (Docker)
+
+on:
+  pull_request:
+    paths:
+      - Dockerfile
+      - start.sh
+      - scripts/smoke-local.sh
+      - ComfyUI/manager_requirements.txt
+      - ComfyUI/requirements.txt
+  push:
+    branches:
+      - main
+    paths:
+      - Dockerfile
+      - start.sh
+      - scripts/smoke-local.sh
+      - ComfyUI/manager_requirements.txt
+      - ComfyUI/requirements.txt
+  workflow_dispatch:
+
+jobs:
+  smoke-local:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          submodules: recursive
+
+      - name: Enable script
+        run: chmod +x scripts/smoke-local.sh
+
+      - name: Docker smoke test
+        env:
+          IMAGE_REF: avatary-image-generator-v1:ci-smoke
+          BUILD_PLATFORM: linux/amd64
+        run: bash scripts/smoke-local.sh
