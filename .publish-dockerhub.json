@@ -1,6 +1,6 @@
 {
   "username": "tenjojeremy",
-  "image": "avatary-content-generator",
+  "image": "avatary-image-generator-v1",
   "platform": "linux/amd64",
   "context": ".",
   "latest": true,
