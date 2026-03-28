@@ -8,60 +8,9 @@ export LD_PRELOAD="${TCMALLOC}"
 USE_SAGE_ATTENTION="${USE_SAGE_ATTENTION:-0}"
 INSTALL_ONNXRUNTIME_AT_STARTUP="${INSTALL_ONNXRUNTIME_AT_STARTUP:-0}"
 
-normalize_cuda_visibility() {
-    # Keep CUDA visibility stable before any Python/Torch process starts.
-    # Invalid values like "all"/"void"/"none" can trigger CUDA init failures.
-    local current="${CUDA_VISIBLE_DEVICES:-}"
-    case "${current,,}" in
-        "" )
-            ;;
-        "all"|"none"|"void"|"no"|"null" )
-            echo "⚠️  CUDA_VISIBLE_DEVICES='$current' is not valid for CUDA runtime; unsetting it."
-            unset CUDA_VISIBLE_DEVICES
-            ;;
-        * )
-            ;;
-    esac
-}
-
-cuda_preflight_ok() {
-    python3 - <<'PY'
-import sys
-try:
-    import torch
-    if not torch.cuda.is_available():
-        raise RuntimeError("torch.cuda.is_available() returned False")
-    _ = torch.cuda.current_device()
-    print("CUDA preflight passed")
-except Exception as e:
-    print(f"CUDA preflight failed: {e}", file=sys.stderr)
-    sys.exit(1)
-PY
-}
-
-normalize_cuda_visibility
-
 log_boot_timing() {
     :
 }
-
-
-if ! which aria2 > /dev/null 2>&1; then
-    aria2_start_ts=$(date +%s)
-    echo "Installing aria2..."
-    apt-get update && apt-get install -y aria2
-    aria2_rc=$?
-    aria2_end_ts=$(date +%s)
-    if [ $aria2_rc -eq 0 ]; then
-        log_boot_timing "package_install" "aria2" "success" "$aria2_start_ts" "$aria2_end_ts" "0" "apt-get"
-    else
-        log_boot_timing "package_install" "aria2" "failed" "$aria2_start_ts" "$aria2_end_ts" "0" "apt-get"
-    fi
-else
-    echo "aria2 is already installed"
-    aria2_now_ts=$(date +%s)
-    log_boot_timing "package_install" "aria2" "skipped_existing" "$aria2_now_ts" "$aria2_now_ts" "0" "apt-get"
-fi
 
 if ! which curl > /dev/null 2>&1; then
     curl_start_ts=$(date +%s)
@@ -127,7 +76,6 @@ log_timing() {
 
 COMFYUI_DIR="$NETWORK_VOLUME/ComfyUI"
 WORKFLOW_DIR="$NETWORK_VOLUME/ComfyUI/user/default/workflows"
-FACE_SWAP_INPUT_DIR="$NETWORK_VOLUME/ComfyUI/face-swap-these"
 
 # Set the target directory
 CUSTOM_NODES_DIR="$NETWORK_VOLUME/ComfyUI/custom_nodes"
@@ -154,9 +102,6 @@ else
         fi
     fi
 fi
-
-# Ensure workflow input folder exists for Load Image Batch in Head-Swap-V1.
-mkdir -p "$FACE_SWAP_INPUT_DIR"
 
 if [ "$INSTALL_ONNXRUNTIME_AT_STARTUP" = "1" ]; then
     (
@@ -230,7 +175,7 @@ install_or_update_custom_node_cnr() {
     archive_name="CNR_${repo_dir}_$(date +%s).zip"
     archive_path="/tmp/${archive_name}"
     rm -f "$archive_path"
-    aria2c -x 8 -s 8 -k 1M --continue=true -d /tmp -o "$archive_name" "$download_url" || rc=$?
+    curl --fail --location --retry 5 --retry-delay 2 --continue-at - --output "$archive_path" "$download_url" || rc=$?
     if [ $rc -ne 0 ]; then
         end_ts=$(date +%s)
         log_timing "custom_node_install" "$repo_dir" "install_failed_download" "$start_ts" "$end_ts" "0" "$download_url"
@@ -334,24 +279,21 @@ download_model() {
         fi
     fi
 
-    # Cleanup aria2 control files
-    rm -f "${full_path}.aria2"
-
     echo "📥 Downloading $destination_file..."
-    local -a aria2_args=(
-        -x 16
-        -s 16
-        -k 1M
-        --continue=true
-        -d "$destination_dir"
-        -o "$destination_file"
+    local -a curl_args=(
+        --fail
+        --location
+        --retry 5
+        --retry-delay 2
+        --continue-at -
+        --output "$full_path"
     )
     if [ -n "$hf_token" ]; then
-        aria2_args+=(--header="Authorization: Bearer $hf_token")
+        curl_args+=(--header "Authorization: Bearer $hf_token")
     else
         echo "⚠️  HUGGINGFACE_TOKEN not set; downloading without Authorization header."
     fi
-    aria2c "${aria2_args[@]}" "$url"
+    curl "${curl_args[@]}" "$url"
     local rc=$?
     local size_bytes=$(stat -f%z "$full_path" 2>/dev/null || stat -c%s "$full_path" 2>/dev/null || echo 0)
     local end_ts=$(date +%s)
@@ -481,11 +423,6 @@ wait_for_all_model_downloads() {
         fi
     done
 
-    echo "Waiting for all aria2 downloads to complete..."
-    while pgrep -x "aria2c" > /dev/null; do
-        echo "🔽 Model downloads still in progress..."
-        sleep 5
-    done
     if [ "$failed_downloads" -gt 0 ]; then
         echo "❌ $failed_downloads model download task(s) failed."
         echo "Failed model download items:"
@@ -681,63 +618,6 @@ if ! ensure_required_vae_models; then
     exit 1
 fi
 
-ensure_manager_runtime_ready() {
-    local manager_reqs="$NETWORK_VOLUME/ComfyUI/manager_requirements.txt"
-    local manager_start_ts
-    local manager_end_ts
-    local rc=0
-
-    manager_start_ts=$(date +%s)
-    if [ ! -f "$manager_reqs" ]; then
-        echo "❌ Missing manager requirements file: $manager_reqs"
-        log_timing "pip_install" "manager_requirements" "failed_missing_file" "$manager_start_ts" "$(date +%s)" "0" "$manager_reqs"
-        return 1
-    fi
-
-    echo "Installing ComfyUI manager runtime requirements..."
-    python3 -m pip install -r "$manager_reqs" || rc=$?
-    manager_end_ts=$(date +%s)
-    if [ $rc -eq 0 ]; then
-        log_timing "pip_install" "manager_requirements" "success" "$manager_start_ts" "$manager_end_ts" "0" "$manager_reqs"
-        return 0
-    fi
-
-    log_timing "pip_install" "manager_requirements" "failed" "$manager_start_ts" "$manager_end_ts" "0" "$manager_reqs"
-    return $rc
-}
-
-if ! ensure_manager_runtime_ready; then
-    echo "ComfyUI manager runtime setup failed; refusing to start ComfyUI with --enable-manager."
-    exit 1
-fi
-
-install_transformers_flash_attn_hotfix() {
-    local hotfix_dir="/tmp/comfy_python_hotfixes"
-    local hotfix_file="$hotfix_dir/sitecustomize.py"
-    mkdir -p "$hotfix_dir"
-
-    # Work around transformers builds that can raise KeyError: 'flash_attn'
-    # when optional flash-attention support is probed by custom nodes.
-    cat > "$hotfix_file" <<'PY'
-try:
-    from transformers.utils import import_utils as _iu  # type: ignore
-    _mapping = getattr(_iu, "PACKAGE_DISTRIBUTION_MAPPING", None)
-    if isinstance(_mapping, dict) and "flash_attn" not in _mapping:
-        _mapping["flash_attn"] = ["flash-attn", "flash_attn"]
-except Exception:
-    pass
-PY
-
-    if [ -n "${PYTHONPATH:-}" ]; then
-        export PYTHONPATH="$hotfix_dir:$PYTHONPATH"
-    else
-        export PYTHONPATH="$hotfix_dir"
-    fi
-    echo "Applied Python runtime hotfix for transformers flash_attn mapping."
-}
-
-install_transformers_flash_attn_hotfix
-
 if [ "$USE_SAGE_ATTENTION" = "1" ]; then
     # Wait for SageAttention build to complete
     echo "Waiting for SageAttention build to complete..."
@@ -771,14 +651,6 @@ echo "Starting ComfyUI"
 COMFY_ARGS=(--listen --enable-manager)
 if [ "$USE_SAGE_ATTENTION" = "1" ]; then
     COMFY_ARGS+=(--use-sage-attention)
-fi
-
-if ! cuda_preflight_ok; then
-    echo "❌ FATAL: CUDA preflight failed. ComfyUI will not start."
-    echo "❌ FATAL: Check pod GPU attachment/runtime configuration and CUDA environment."
-    echo "❌ FATAL: Startup aborted before launching main.py."
-    log_timing "startup" "cuda_preflight" "failed_abort" "$INSTALL_START_TS" "$(date +%s)" "0" "torch.cuda"
-    exit 1
 fi
 
 nohup python3 "$NETWORK_VOLUME/ComfyUI/main.py" "${COMFY_ARGS[@]}" > "$NETWORK_VOLUME/comfyui_${RUNPOD_POD_ID}_nohup.log" 2>&1 &

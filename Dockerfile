@@ -7,7 +7,6 @@ RUN apt-get update --yes && \
     DEBIAN_FRONTEND=noninteractive apt-get install --yes --no-install-recommends \
     git \
     curl \
-    aria2 \
     wget \
     zip \
     libgoogle-perftools4 && \
