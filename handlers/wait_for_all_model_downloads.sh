@@ -15,16 +15,6 @@ wait_for_all_model_downloads() {
         fi
     done
 
-    echo "Waiting for model-id downloads to complete..."
-    for i in "${!MODEL_ID_DOWNLOAD_PIDS[@]}"; do
-        local pid="${MODEL_ID_DOWNLOAD_PIDS[$i]}"
-        local label="${MODEL_ID_DOWNLOAD_LABELS[$i]}"
-        if ! wait "$pid"; then
-            failed_downloads=$((failed_downloads + 1))
-            failed_items+=("$label")
-        fi
-    done
-
     if [ "$failed_downloads" -gt 0 ]; then
         echo "❌ $failed_downloads model download task(s) failed."
         echo "Failed model download items:"

@@ -4,9 +4,6 @@
 TCMALLOC="$(ldconfig -p | grep -Po "libtcmalloc.so.\d" | head -n 1)"
 export LD_PRELOAD="${TCMALLOC}"
 
-# Startup tuning knobs
-INSTALL_ONNXRUNTIME_AT_STARTUP="${INSTALL_ONNXRUNTIME_AT_STARTUP:-0}"
-
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 for handler_file in "$SCRIPT_DIR"/handlers/*.sh; do
     # shellcheck source=/dev/null
@@ -76,25 +73,6 @@ else
     fi
 fi
 
-if [ "$INSTALL_ONNXRUNTIME_AT_STARTUP" = "1" ]; then
-    (
-        onnx_start_ts=$(date +%s)
-        pip install onnxruntime-gpu
-        onnx_rc=$?
-        onnx_end_ts=$(date +%s)
-        if [ $onnx_rc -eq 0 ]; then
-            log_timing "pip_install" "onnxruntime-gpu" "success" "$onnx_start_ts" "$onnx_end_ts" "0" "pip"
-        else
-            log_timing "pip_install" "onnxruntime-gpu" "failed" "$onnx_start_ts" "$onnx_end_ts" "0" "pip"
-        fi
-        exit $onnx_rc
-    ) &
-else
-    echo "Skipping runtime onnxruntime-gpu install (INSTALL_ONNXRUNTIME_AT_STARTUP=$INSTALL_ONNXRUNTIME_AT_STARTUP)"
-    onnx_now_ts=$(date +%s)
-    log_timing "pip_install" "onnxruntime-gpu" "skipped_disabled" "$onnx_now_ts" "$onnx_now_ts" "0" "env:INSTALL_ONNXRUNTIME_AT_STARTUP"
-fi
-
 # Change to the directory
 mkdir -p "$CUSTOM_NODES_DIR"
 cd "$CUSTOM_NODES_DIR" || exit 1
@@ -125,8 +103,6 @@ echo "📦 Starting model downloads..."
 
 PRIMARY_MODEL_DOWNLOAD_PIDS=()
 PRIMARY_MODEL_DOWNLOAD_LABELS=()
-MODEL_ID_DOWNLOAD_PIDS=()
-MODEL_ID_DOWNLOAD_LABELS=()
 
 # Models
 download_model_bg "https://huggingface.co/avatary-ai/files/resolve/main/ae.safetensors" "$VAE_DIR/ae.safetensors"
@@ -142,88 +118,8 @@ download_model_bg "https://huggingface.co/avatary-ai/files/resolve/main/seedvr2_
 download_model_bg "https://huggingface.co/avatary-ai/files/resolve/main/ema_vae_fp16.safetensors" "$SEEDVR2_DIR/ema_vae_fp16.safetensors"
 download_model_bg "https://huggingface.co/avatary-ai/files/resolve/main/sam3.pt" "$SAM3_DIR/sam3.pt"
 
-declare -A MODEL_CATEGORIES=(
-    ["$NETWORK_VOLUME/ComfyUI/models/checkpoints"]="$CHECKPOINT_IDS_TO_DOWNLOAD"
-    ["$NETWORK_VOLUME/ComfyUI/models/loras"]="$LORAS_IDS_TO_DOWNLOAD"
-)
-
-# Counter to track background jobs
-download_count=0
-
-# Ensure directories exist and schedule downloads in background
-for TARGET_DIR in "${!MODEL_CATEGORIES[@]}"; do
-    mkdir -p "$TARGET_DIR"
-    MODEL_IDS_STRING="${MODEL_CATEGORIES[$TARGET_DIR]}"
-
-    # Skip if the value is the default placeholder
-    if [[ "$MODEL_IDS_STRING" == "replace_with_ids" ]]; then
-        echo "⏭️  Skipping downloads for $TARGET_DIR (default value detected)"
-        continue
-    fi
-
-    IFS=',' read -ra MODEL_IDS <<< "$MODEL_IDS_STRING"
-
-    for MODEL_ID in "${MODEL_IDS[@]}"; do
-        sleep 1
-        echo "Scheduling download: $MODEL_ID to $TARGET_DIR"
-        download_model_id_bg "$TARGET_DIR" "$MODEL_ID"
-        ((download_count++))
-    done
-done
-
-echo "Scheduled $download_count downloads in background"
-
-
 # Ensure the file exists in the current directory before moving it
 cd /
-
-echo "Updating default preview method..."
-sed -i '/id: *'"'"'VHS.LatentPreview'"'"'/,/defaultValue:/s/defaultValue: false/defaultValue: true/' $NETWORK_VOLUME/ComfyUI/custom_nodes/ComfyUI-VideoHelperSuite/web/js/VHS.core.js
-CONFIG_PATH="$NETWORK_VOLUME/ComfyUI/user/default/ComfyUI-Manager"
-CONFIG_FILE="$CONFIG_PATH/config.ini"
-
-# Ensure the directory exists
-mkdir -p "$CONFIG_PATH"
-
-# Create the config file if it doesn't exist
-if [ ! -f "$CONFIG_FILE" ]; then
-    echo "Creating config.ini..."
-    cat <<EOL > "$CONFIG_FILE"
-[default]
-preview_method = auto
-git_exe =
-use_uv = False
-channel_url = https://raw.githubusercontent.com/ltdrdata/ComfyUI-Manager/main
-share_option = all
-bypass_ssl = False
-file_logging = True
-component_policy = workflow
-update_policy = stable-comfyui
-windows_selector_event_loop_policy = False
-model_download_by_agent = False
-downgrade_blacklist =
-security_level = normal
-skip_migration_check = False
-always_lazy_install = False
-network_mode = public
-db_mode = cache
-EOL
-else
-    echo "config.ini already exists. Updating preview_method..."
-    sed -i 's/^preview_method = .*/preview_method = auto/' "$CONFIG_FILE"
-fi
-echo "Config file setup complete!"
-echo "Default preview method updated to 'auto'"
-
-
-echo "Enabling Modern Node Design (Nodes 2.0) by default..."
-ensure_nodes2_enabled
-echo "Modern Node Design (Nodes 2.0) enabled."
-
-# Workspace as main working directory
-echo "cd $NETWORK_VOLUME" >> ~/.bashrc
-
-
 
 echo "Renaming loras downloaded as zip files to safetensors files"
 
