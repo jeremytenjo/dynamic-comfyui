@@ -51,7 +51,6 @@ mkdir -p "$NETWORK_VOLUME"
 
 
 COMFYUI_DIR="$NETWORK_VOLUME/ComfyUI"
-WORKFLOW_DIR="$NETWORK_VOLUME/ComfyUI/user/default/workflows"
 CUSTOM_NODES_DIR="$NETWORK_VOLUME/ComfyUI/custom_nodes"
 
 if [ ! -d "$COMFYUI_DIR" ]; then
@@ -119,9 +118,6 @@ DIFFUSION_MODELS_DIR="$NETWORK_VOLUME/ComfyUI/models/diffusion_models"
 TEXT_ENCODERS_DIR="$NETWORK_VOLUME/ComfyUI/models/text_encoders"
 VAE_DIR="$NETWORK_VOLUME/ComfyUI/models/vae"
 LORAS_DIR="$NETWORK_VOLUME/ComfyUI/models/loras"
-CHECKPOINTS_DIR="$NETWORK_VOLUME/ComfyUI/models/checkpoints"
-UPSCALE_DIR="$NETWORK_VOLUME/ComfyUI/models/upscale_models"
-LATENT_UPSCALE_DIR="$NETWORK_VOLUME/ComfyUI/models/latent_upscale_models"
 SEEDVR2_DIR="$NETWORK_VOLUME/ComfyUI/models/SEEDVR2"
 SAM3_DIR="$NETWORK_VOLUME/ComfyUI/models/sam3"
 
