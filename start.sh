@@ -766,6 +766,36 @@ if ! ensure_required_vae_models; then
     exit 1
 fi
 
+ensure_manager_runtime_ready() {
+    local manager_reqs="$NETWORK_VOLUME/ComfyUI/manager_requirements.txt"
+    local manager_start_ts
+    local manager_end_ts
+    local rc=0
+
+    manager_start_ts=$(date +%s)
+    if [ ! -f "$manager_reqs" ]; then
+        echo "❌ Missing manager requirements file: $manager_reqs"
+        log_timing "pip_install" "manager_requirements" "failed_missing_file" "$manager_start_ts" "$(date +%s)" "0" "$manager_reqs"
+        return 1
+    fi
+
+    echo "Installing ComfyUI manager runtime requirements..."
+    python3 -m pip install -r "$manager_reqs" || rc=$?
+    manager_end_ts=$(date +%s)
+    if [ $rc -eq 0 ]; then
+        log_timing "pip_install" "manager_requirements" "success" "$manager_start_ts" "$manager_end_ts" "0" "$manager_reqs"
+        return 0
+    fi
+
+    log_timing "pip_install" "manager_requirements" "failed" "$manager_start_ts" "$manager_end_ts" "0" "$manager_reqs"
+    return $rc
+}
+
+if ! ensure_manager_runtime_ready; then
+    echo "ComfyUI manager runtime setup failed; refusing to start ComfyUI with --enable-manager."
+    exit 1
+fi
+
 if [ "$USE_SAGE_ATTENTION" = "1" ]; then
     # Wait for SageAttention build to complete
     echo "Waiting for SageAttention build to complete..."
