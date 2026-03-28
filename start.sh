@@ -303,17 +303,30 @@ install_or_update_custom_node() {
 }
 
 echo "Ensuring required custom nodes are installed..."
-install_or_update_custom_node "https://github.com/ltdrdata/was-node-suite-comfyui.git" "was-node-suite-comfyui"
-install_or_update_custom_node "https://github.com/1038lab/ComfyUI-RMBG.git" "ComfyUI-RMBG"
-install_or_update_custom_node "https://github.com/lquesada/ComfyUI-Inpaint-CropAndStitch.git" "ComfyUI-Inpaint-CropAndStitch"
-install_or_update_custom_node "https://github.com/city96/ComfyUI-GGUF.git" "ComfyUI-GGUF"
+require_custom_node() {
+    local repo_url="$1"
+    local repo_dir="$2"
+    if ! install_or_update_custom_node "$repo_url" "$repo_dir"; then
+        local end_ts
+        end_ts=$(date +%s)
+        echo "❌ Required custom node install/update failed: $repo_dir"
+        log_timing "custom_node_install" "$repo_dir" "required_failed_abort" "$INSTALL_START_TS" "$end_ts" "0" "$repo_url"
+        exit 1
+    fi
+}
+
+require_custom_node "https://github.com/ltdrdata/was-node-suite-comfyui.git" "was-node-suite-comfyui"
+require_custom_node "https://github.com/ltdrdata/ComfyUI-Manager.git" "ComfyUI-Manager"
+require_custom_node "https://github.com/1038lab/ComfyUI-RMBG.git" "ComfyUI-RMBG"
+require_custom_node "https://github.com/lquesada/ComfyUI-Inpaint-CropAndStitch.git" "ComfyUI-Inpaint-CropAndStitch"
+require_custom_node "https://github.com/city96/ComfyUI-GGUF.git" "ComfyUI-GGUF"
 
 
 # Function to download a model using huggingface-cli
 download_model() {
     local url="$1"
     local full_path="$2"
-    local hf_token="your_hf_token_here" # Best to pass this as a 3rd argument or env var
+    local hf_token="${HUGGINGFACE_TOKEN:-}"
     local start_ts=$(date +%s)
 
     local destination_dir=$(dirname "$full_path")
@@ -338,12 +351,20 @@ download_model() {
     rm -f "${full_path}.aria2"
 
     echo "📥 Downloading $destination_file..."
-    aria2c -x 16 -s 16 -k 1M \
-        --header="Authorization: Bearer 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" \
-        --continue=true \
-        -d "$destination_dir" \
-        -o "$destination_file" \
-        "$url"
+    local -a aria2_args=(
+        -x 16
+        -s 16
+        -k 1M
+        --continue=true
+        -d "$destination_dir"
+        -o "$destination_file"
+    )
+    if [ -n "$hf_token" ]; then
+        aria2_args+=(--header="Authorization: Bearer $hf_token")
+    else
+        echo "⚠️  HUGGINGFACE_TOKEN not set; downloading without Authorization header."
+    fi
+    aria2c "${aria2_args[@]}" "$url"
     local rc=$?
     local size_bytes=$(stat -f%z "$full_path" 2>/dev/null || stat -c%s "$full_path" 2>/dev/null || echo 0)
     local end_ts=$(date +%s)
@@ -487,7 +508,7 @@ cd /
 if [ "$change_preview_method" == "true" ]; then
     echo "Updating default preview method..."
     sed -i '/id: *'"'"'VHS.LatentPreview'"'"'/,/defaultValue:/s/defaultValue: false/defaultValue: true/' $NETWORK_VOLUME/ComfyUI/custom_nodes/ComfyUI-VideoHelperSuite/web/js/VHS.core.js
-    CONFIG_PATH="/ComfyUI/user/default/ComfyUI-Manager"
+    CONFIG_PATH="$NETWORK_VOLUME/ComfyUI/user/default/ComfyUI-Manager"
     CONFIG_FILE="$CONFIG_PATH/config.ini"
 
 # Ensure the directory exists
