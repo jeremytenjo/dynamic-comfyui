@@ -14,8 +14,6 @@
     "publish:dockerhub": "tsx scripts/publish-dockerhub.ts --username tenjojeremy",
     "publish:patch": "tsx scripts/publish-dockerhub.ts --username tenjojeremy --bump patch --latest",
     "publish:minor": "tsx scripts/publish-dockerhub.ts --username tenjojeremy --bump minor --latest",
-    "publish:major": "tsx scripts/publish-dockerhub.ts --username tenjojeremy --bump major --latest",
-    "smoke:local": "bash scripts/smoke-local.sh",
-    "smoke:runpod": "bash scripts/smoke-runpod.sh"
+    "publish:major": "tsx scripts/publish-dockerhub.ts --username tenjojeremy --bump major --latest"
   }
 }
