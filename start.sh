@@ -76,7 +76,7 @@ custom_node_idx=0
 for custom_node_spec in "${CUSTOM_NODE_SPECS[@]}"; do
     IFS='|' read -r cnr_id repo_dir cnr_version <<< "$custom_node_spec"
     custom_node_idx=$((custom_node_idx + 1))
-    echo "[$custom_node_idx/$total_custom_nodes] Installing custom node: $repo_dir"
+    echo "⬇️ [$custom_node_idx/$total_custom_nodes] Installing $repo_dir"
     require_custom_node "$cnr_id" "$repo_dir" "$cnr_version"
 done
 
@@ -115,7 +115,7 @@ model_idx=0
 for model_spec in "${MODEL_SPECS[@]}"; do
     IFS='|' read -r model_url model_path <<< "$model_spec"
     model_idx=$((model_idx + 1))
-    echo "[$model_idx/$total_models] Queueing model download: $(basename "$model_path")"
+    echo "⬇️ [$model_idx/$total_models] Queueing $(basename "$model_path")"
     download_model_bg "$model_url" "$model_path"
 done
 
