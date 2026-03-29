@@ -11,6 +11,7 @@
     "typescript": "5.9.3"
   },
   "scripts": {
+    "ssh:runpod": "tsx scripts/setup-runpod-ssh.ts",
     "publish:dockerhub": "tsx scripts/publish-dockerhub.ts --username tenjojeremy",
     "publish:patch": "tsx scripts/publish-dockerhub.ts --username tenjojeremy --bump patch --latest",
     "publish:minor": "tsx scripts/publish-dockerhub.ts --username tenjojeremy --bump minor --latest",
