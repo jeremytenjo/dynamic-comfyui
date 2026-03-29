@@ -59,16 +59,26 @@ cd "$CUSTOM_NODES_DIR" || exit 1
 
 echo "Ensuring required custom nodes are installed..."
 
-# Custom Nodes
-require_custom_node "was-ns" "was-node-suite-comfyui" "3.0.1"
-require_custom_node "comfyui-manager" "ComfyUI-Manager" "3.0.1"
-require_custom_node "comfyui-rmbg" "ComfyUI-RMBG" "3.0.0"
-require_custom_node "comfyui-inpaint-cropandstitch" "ComfyUI-Inpaint-CropAndStitch" "3.0.10"
-require_custom_node "ComfyUI-GGUF" "ComfyUI-GGUF" "1.1.10"
-require_custom_node "comfyui-kjnodes" "ComfyUI-KJNodes" "1.3.6"
-require_custom_node "comfyui-easy-use" "ComfyUI-Easy-Use" "1.3.6"
-require_custom_node "seedvr2_videoupscaler" "ComfyUI-SeedVR2_VideoUpscaler" "2.5.22"
-require_custom_node "comfyui_essentials" "ComfyUI_essentials" "1.1.0"
+CUSTOM_NODE_SPECS=(
+    "was-ns|was-node-suite-comfyui|3.0.1"
+    "comfyui-manager|ComfyUI-Manager|3.0.1"
+    "comfyui-rmbg|ComfyUI-RMBG|3.0.0"
+    "comfyui-inpaint-cropandstitch|ComfyUI-Inpaint-CropAndStitch|3.0.10"
+    "ComfyUI-GGUF|ComfyUI-GGUF|1.1.10"
+    "comfyui-kjnodes|ComfyUI-KJNodes|1.3.6"
+    "comfyui-easy-use|ComfyUI-Easy-Use|1.3.6"
+    "seedvr2_videoupscaler|ComfyUI-SeedVR2_VideoUpscaler|2.5.22"
+    "comfyui_essentials|ComfyUI_essentials|1.1.0"
+)
+
+total_custom_nodes=${#CUSTOM_NODE_SPECS[@]}
+custom_node_idx=0
+for custom_node_spec in "${CUSTOM_NODE_SPECS[@]}"; do
+    IFS='|' read -r cnr_id repo_dir cnr_version <<< "$custom_node_spec"
+    custom_node_idx=$((custom_node_idx + 1))
+    echo "[$custom_node_idx/$total_custom_nodes] Installing custom node: $repo_dir"
+    require_custom_node "$cnr_id" "$repo_dir" "$cnr_version"
+done
 
 # Define base paths
 DIFFUSION_MODELS_DIR="$NETWORK_VOLUME/ComfyUI/models/diffusion_models"
@@ -85,19 +95,29 @@ echo "📦 Starting model downloads..."
 export PRIMARY_MODEL_DOWNLOAD_PIDS=()
 export PRIMARY_MODEL_DOWNLOAD_LABELS=()
 
-# Models
-download_model_bg "https://huggingface.co/avatary-ai/files/resolve/main/ae.safetensors" "$VAE_DIR/ae.safetensors"
-download_model_bg "https://huggingface.co/avatary-ai/files/resolve/main/qwen_3_4b.safetensors" "$TEXT_ENCODERS_DIR/qwen_3_4b.safetensors"
-download_model_bg "https://huggingface.co/avatary-ai/files/resolve/main/Qwen3-4b-Z-Image-Engineer-V4-F16.gguf" "$TEXT_ENCODERS_DIR/Qwen3-4b-Z-Image-Engineer-V4-F16.gguf"
-download_model_bg "https://huggingface.co/avatary-ai/files/resolve/main/z_image_bf16.safetensors" "$DIFFUSION_MODELS_DIR/z_image_bf16.safetensors"
-download_model_bg "https://huggingface.co/avatary-ai/files/resolve/main/z_image_turbo_bf16.safetensors" "$DIFFUSION_MODELS_DIR/z_image_turbo.safetensors"
-download_model_bg "https://huggingface.co/avatary-ai/files/resolve/main/z_image_turbo.safetensors" "$DIFFUSION_MODELS_DIR/z-image-turbo-nsfw.safetensors"
-download_model_bg "https://huggingface.co/avatary-ai/files/resolve/main/z_image_vae.safetensors" "$VAE_DIR/z_image_vae.safetensors"
-download_model_bg "https://huggingface.co/avatary-ai/files/resolve/main/Z-Image-AbliteratedV1.f16.gguf" "$TEXT_ENCODERS_DIR/Z-Image-AbliteratedV1.f16.gguf"
-download_model_bg "https://huggingface.co/avatary-ai/files/resolve/main/Z-Image-AbliteratedV1.f16.safetensors" "$TEXT_ENCODERS_DIR/Z-Image-AbliteratedV1.f16.safetensors"
-download_model_bg "https://huggingface.co/avatary-ai/files/resolve/main/seedvr2_ema_7b_fp16.safetensors" "$SEEDVR2_DIR/seedvr2_ema_7b_fp16.safetensors"
-download_model_bg "https://huggingface.co/avatary-ai/files/resolve/main/ema_vae_fp16.safetensors" "$SEEDVR2_DIR/ema_vae_fp16.safetensors"
-download_model_bg "https://huggingface.co/avatary-ai/files/resolve/main/sam3.pt" "$SAM3_DIR/sam3.pt"
+MODEL_SPECS=(
+    "https://huggingface.co/avatary-ai/files/resolve/main/ae.safetensors|$VAE_DIR/ae.safetensors"
+    "https://huggingface.co/avatary-ai/files/resolve/main/qwen_3_4b.safetensors|$TEXT_ENCODERS_DIR/qwen_3_4b.safetensors"
+    "https://huggingface.co/avatary-ai/files/resolve/main/Qwen3-4b-Z-Image-Engineer-V4-F16.gguf|$TEXT_ENCODERS_DIR/Qwen3-4b-Z-Image-Engineer-V4-F16.gguf"
+    "https://huggingface.co/avatary-ai/files/resolve/main/z_image_bf16.safetensors|$DIFFUSION_MODELS_DIR/z_image_bf16.safetensors"
+    "https://huggingface.co/avatary-ai/files/resolve/main/z_image_turbo_bf16.safetensors|$DIFFUSION_MODELS_DIR/z_image_turbo.safetensors"
+    "https://huggingface.co/avatary-ai/files/resolve/main/z_image_turbo.safetensors|$DIFFUSION_MODELS_DIR/z-image-turbo-nsfw.safetensors"
+    "https://huggingface.co/avatary-ai/files/resolve/main/z_image_vae.safetensors|$VAE_DIR/z_image_vae.safetensors"
+    "https://huggingface.co/avatary-ai/files/resolve/main/Z-Image-AbliteratedV1.f16.gguf|$TEXT_ENCODERS_DIR/Z-Image-AbliteratedV1.f16.gguf"
+    "https://huggingface.co/avatary-ai/files/resolve/main/Z-Image-AbliteratedV1.f16.safetensors|$TEXT_ENCODERS_DIR/Z-Image-AbliteratedV1.f16.safetensors"
+    "https://huggingface.co/avatary-ai/files/resolve/main/seedvr2_ema_7b_fp16.safetensors|$SEEDVR2_DIR/seedvr2_ema_7b_fp16.safetensors"
+    "https://huggingface.co/avatary-ai/files/resolve/main/ema_vae_fp16.safetensors|$SEEDVR2_DIR/ema_vae_fp16.safetensors"
+    "https://huggingface.co/avatary-ai/files/resolve/main/sam3.pt|$SAM3_DIR/sam3.pt"
+)
+
+total_models=${#MODEL_SPECS[@]}
+model_idx=0
+for model_spec in "${MODEL_SPECS[@]}"; do
+    IFS='|' read -r model_url model_path <<< "$model_spec"
+    model_idx=$((model_idx + 1))
+    echo "[$model_idx/$total_models] Queueing model download: $(basename "$model_path")"
+    download_model_bg "$model_url" "$model_path"
+done
 
 # Ensure the file exists in the current directory before moving it
 cd /
