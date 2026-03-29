@@ -37,9 +37,4 @@ configure_torch_cuda_allocator() {
         echo "Cleared PYTORCH_CUDA_ALLOC_CONF backend override for stable startup."
     fi
 
-    # Default to disable cudaMallocAsync unless explicitly overridden.
-    # Set COMFY_DISABLE_CUDA_MALLOC=0 to re-enable ComfyUI's cudaMalloc behavior.
-    if [ -z "${COMFY_DISABLE_CUDA_MALLOC:-}" ]; then
-        export COMFY_DISABLE_CUDA_MALLOC=1
-    fi
 }
