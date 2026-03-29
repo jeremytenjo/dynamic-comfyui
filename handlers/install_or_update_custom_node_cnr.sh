@@ -16,7 +16,7 @@ install_or_update_custom_node_cnr() {
     local resolved_version=""
     start_ts=$(date +%s)
 
-    echo "⬇️ Installing custom node from ComfyUI Registry: $repo_dir ($cnr_id@$cnr_version)"
+    echo "⬇️ Installing node from ComfyUI Registry: $repo_dir ($cnr_id@$cnr_version)"
 
     metadata_json="$(curl -fsSL "https://api.comfy.org/nodes/${cnr_id}/install?version=${cnr_version}")" || rc=$?
     if [ $rc -ne 0 ]; then
