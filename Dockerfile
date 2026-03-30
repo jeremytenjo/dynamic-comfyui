@@ -22,9 +22,10 @@ RUN pip install --no-cache-dir --upgrade pip && \
 
 COPY ComfyUI /ComfyUI
 COPY start.sh /start.sh
+COPY install.sh /install.sh
 COPY handlers /handlers
 
-RUN chmod +x /start.sh
+RUN chmod +x /start.sh /install.sh
 
 EXPOSE 8188 8888
 
