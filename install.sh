@@ -5,7 +5,7 @@ TCMALLOC="$(ldconfig -p | grep -Po "libtcmalloc.so.\d" | head -n 1)"
 export LD_PRELOAD="${TCMALLOC}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-for handler_file in "$SCRIPT_DIR"/handlers/*.sh; do
+for handler_file in "$SCRIPT_DIR"/handlers/install/*.sh; do
     # shellcheck source=/dev/null
     source "$handler_file"
 done
