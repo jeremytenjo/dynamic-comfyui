@@ -22,11 +22,7 @@ RUN echo "ComfyUI update token: ${COMFYUI_UPDATE_TOKEN}" && \
     comfy --skip-prompt tracking disable >/dev/null 2>&1 || true && \
     export COMFYUI_INSTALL_VERSION="${COMFYUI_VERSION}" && \
     if [ -z "${COMFYUI_INSTALL_VERSION}" ]; then \
-        case "${COMFYUI_UPDATE_TOKEN}" in \
-            nightly) COMFYUI_INSTALL_VERSION="nightly" ;; \
-            stable|latest|"") COMFYUI_INSTALL_VERSION="latest" ;; \
-            *) echo "❌ COMFYUI_UPDATE_TOKEN must be one of: stable, latest, nightly." && exit 1 ;; \
-        esac; \
+        COMFYUI_INSTALL_VERSION="v0.18.2"; \
         comfy ${noninteractive_args} --workspace=/ install --nvidia --skip-torch-or-directml --version "${COMFYUI_INSTALL_VERSION}"; \
     elif printf '%s' "${COMFYUI_INSTALL_VERSION}" | grep -Eq '^v?[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z]+)*$'; then \
         comfy ${noninteractive_args} --workspace=/ install --nvidia --skip-torch-or-directml --version "${COMFYUI_INSTALL_VERSION#v}"; \
