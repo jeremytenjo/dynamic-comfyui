@@ -40,7 +40,18 @@ RUN set -eux; \
         echo "ComfyUI already present in base image. Skipping install because COMFYUI_UPGRADE=false."; \
     else \
         rm -rf /ComfyUI; \
-        comfy ${noninteractive_args} --workspace=/ install --nvidia --skip-torch-or-directml --version "${COMFYUI_INSTALL_VERSION#v}"; \
+        set +e; \
+        install_log=$(comfy ${noninteractive_args} --workspace=/ install --nvidia --skip-torch-or-directml --version "${COMFYUI_INSTALL_VERSION#v}" 2>&1); \
+        install_rc=$?; \
+        set -e; \
+        echo "${install_log}"; \
+        if [ ${install_rc} -ne 0 ]; then \
+            echo ""; \
+            echo "========================================"; \
+            echo "❌ comfy install FAILED (exit code ${install_rc})"; \
+            echo "========================================"; \
+            exit ${install_rc}; \
+        fi; \
     fi
 
 COPY start.sh /start.sh
