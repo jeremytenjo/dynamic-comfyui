@@ -1,5 +1,76 @@
 # shellcheck shell=bash
 
+preloaded_comfyui_path_file() {
+    echo "/opt/comfyui-preload.path"
+}
+
+
+append_candidate_dir_if_set() {
+    local candidate="$1"
+    local -n candidate_list_ref="$2"
+
+    if [ -n "$candidate" ]; then
+        candidate_list_ref+=("$candidate")
+    fi
+}
+
+
+resolve_preloaded_comfyui_dir_with_comfy_which() {
+    if ! command -v comfy > /dev/null 2>&1; then
+        return 1
+    fi
+
+    local probe_workspace="/opt/comfyui-preload"
+    local resolved
+    resolved="$(comfy --workspace="$probe_workspace" which 2>/dev/null | tail -n 1 | tr -d '\r' || true)"
+    if [ -n "$resolved" ]; then
+        printf '%s\n' "$resolved"
+        return 0
+    fi
+
+    return 1
+}
+
+
+preloaded_comfyui_dir() {
+    local path_file
+    path_file="$(preloaded_comfyui_path_file)"
+
+    local -a candidates=()
+    if [ -f "$path_file" ]; then
+        local from_file
+        from_file="$(head -n 1 "$path_file" | tr -d '\r' || true)"
+        append_candidate_dir_if_set "$from_file" candidates
+    fi
+
+    local from_which
+    from_which="$(resolve_preloaded_comfyui_dir_with_comfy_which || true)"
+    append_candidate_dir_if_set "$from_which" candidates
+
+    append_candidate_dir_if_set "/opt/comfyui-preload" candidates
+    append_candidate_dir_if_set "/opt/comfyui-preload/ComfyUI" candidates
+
+    local candidate
+    for candidate in "${candidates[@]}"; do
+        if is_comfyui_workspace_sane "$candidate"; then
+            echo "$candidate"
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+
+is_comfyui_workspace_sane() {
+    local workspace_dir="$1"
+
+    [ -d "$workspace_dir/.git" ] &&
+        [ -f "$workspace_dir/main.py" ] &&
+        [ -d "$workspace_dir/custom_nodes" ] &&
+        [ -d "$workspace_dir/models" ]
+}
+
 
 install_comfy_cli_package() {
     local -a pip_args=(install comfy-cli)
@@ -107,6 +178,47 @@ cleanup_comfyui_invalid_backup() {
 }
 
 
+seed_comfyui_workspace_from_preload() {
+    local preload_dir
+    preload_dir="$(preloaded_comfyui_dir || true)"
+
+    if [ -d "$COMFYUI_DIR/.git" ]; then
+        # Existing workspace should continue through comfy-cli install/update path.
+        return 1
+    fi
+
+    if [ -e "$COMFYUI_DIR" ]; then
+        # A non-git directory would have been handled by prepare_comfyui_install_target.
+        return 1
+    fi
+
+    if [ -z "$preload_dir" ] || [ ! -d "$preload_dir" ]; then
+        return 1
+    fi
+
+    if ! is_comfyui_workspace_sane "$preload_dir"; then
+        echo "⚠️ Preloaded ComfyUI workspace is invalid: $preload_dir"
+        return 1
+    fi
+
+    echo "Seeding ComfyUI workspace from preloaded core: $preload_dir"
+    if ! cp -a "$preload_dir" "$COMFYUI_DIR"; then
+        echo "⚠️ Failed to seed ComfyUI workspace from preload; falling back to comfy install."
+        rm -rf "$COMFYUI_DIR" 2>/dev/null || true
+        return 1
+    fi
+
+    if ! is_comfyui_workspace_sane "$COMFYUI_DIR"; then
+        echo "⚠️ Seeded ComfyUI workspace failed validation; falling back to comfy install."
+        rm -rf "$COMFYUI_DIR" 2>/dev/null || true
+        return 1
+    fi
+
+    echo "✅ Seeded ComfyUI workspace from preloaded core."
+    return 0
+}
+
+
 install_comfyui_with_comfy_cli() {
     if ! ensure_comfy_cli_ready; then
         return 1
@@ -114,6 +226,10 @@ install_comfyui_with_comfy_cli() {
 
     if ! prepare_comfyui_install_target; then
         return 1
+    fi
+
+    if seed_comfyui_workspace_from_preload; then
+        return 0
     fi
 
     local install_help
