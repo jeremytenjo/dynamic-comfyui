@@ -21,14 +21,18 @@ RUN echo "ComfyUI update token: ${COMFYUI_UPDATE_TOKEN}" && \
     noninteractive_args="--skip-prompt" && \
     comfy --skip-prompt tracking disable >/dev/null 2>&1 || true && \
     export COMFYUI_INSTALL_VERSION="${COMFYUI_VERSION}" && \
+    COMFYUI_INSTALL_VERSION="$(printf '%s' "${COMFYUI_INSTALL_VERSION}" | tr -d '[:space:]')" && \
     if [ -z "${COMFYUI_INSTALL_VERSION}" ]; then \
         COMFYUI_INSTALL_VERSION="v0.18.2"; \
-        comfy ${noninteractive_args} --workspace=/ install --nvidia --skip-torch-or-directml --version "${COMFYUI_INSTALL_VERSION}"; \
     elif printf '%s' "${COMFYUI_INSTALL_VERSION}" | grep -Eq '^v?[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z]+)*$'; then \
-        comfy ${noninteractive_args} --workspace=/ install --nvidia --skip-torch-or-directml --version "${COMFYUI_INSTALL_VERSION#v}"; \
+        true; \
+    elif [ "${COMFYUI_INSTALL_VERSION}" = "latest" ] || [ "${COMFYUI_INSTALL_VERSION}" = "stable" ] || [ "${COMFYUI_INSTALL_VERSION}" = "nightly" ]; then \
+        echo "⚠️ COMFYUI_VERSION='${COMFYUI_INSTALL_VERSION}' is legacy; using pinned default v0.18.2."; \
+        COMFYUI_INSTALL_VERSION="v0.18.2"; \
     else \
-        echo "❌ COMFYUI_VERSION must be semver (example: 0.3.39 or v0.3.39)." && exit 1; \
-    fi
+        echo "❌ COMFYUI_VERSION must be semver (example: 0.18.2 or v0.18.2). Got: '${COMFYUI_INSTALL_VERSION}'." && exit 1; \
+    fi && \
+    comfy ${noninteractive_args} --workspace=/ install --nvidia --skip-torch-or-directml --version "${COMFYUI_INSTALL_VERSION#v}"
 
 COPY start.sh /start.sh
 COPY install.sh /install.sh

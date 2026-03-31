@@ -124,18 +124,25 @@ install_comfyui_core_with_comfy_cli() {
     fi
 
     local install_version="${COMFYUI_VERSION:-v0.18.2}"
+    install_version="$(printf '%s' "$install_version" | tr -d '[:space:]')"
     local -a comfy_install_cmd=(comfy)
     while IFS= read -r arg; do
         [ -n "$arg" ] && comfy_install_cmd+=("$arg")
     done < <(comfy_global_noninteractive_args)
     comfy_install_cmd+=(--workspace="$NETWORK_VOLUME" install --nvidia --skip-torch-or-directml)
 
-    if printf '%s' "$install_version" | grep -Eq '^v?[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z]+)*$'; then
-        comfy_install_cmd+=(--version "${install_version#v}")
+    if [ -z "$install_version" ]; then
+        install_version="v0.18.2"
+    elif printf '%s' "$install_version" | grep -Eq '^v?[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z]+)*$'; then
+        true
+    elif [ "$install_version" = "latest" ] || [ "$install_version" = "stable" ] || [ "$install_version" = "nightly" ]; then
+        echo "⚠️ COMFYUI_VERSION='$install_version' is legacy; using pinned default v0.18.2."
+        install_version="v0.18.2"
     else
-        echo "❌ COMFYUI_VERSION must be semver (example: 0.3.39 or v0.3.39)."
+        echo "❌ COMFYUI_VERSION must be semver (example: 0.18.2 or v0.18.2). Got: '$install_version'."
         return 1
     fi
+    comfy_install_cmd+=(--version "${install_version#v}")
 
     echo "Installing ComfyUI core via comfy-cli (version: ${install_version})..."
     if ! "${comfy_install_cmd[@]}"; then
