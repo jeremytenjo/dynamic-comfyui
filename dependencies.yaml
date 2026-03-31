@@ -25,8 +25,6 @@ models:
     target: 'models/text_encoders/qwen_3_4b.safetensors'
   - url: 'https://huggingface.co/avatary-ai/files/resolve/main/Qwen3-4b-Z-Image-Engineer-V4-F16.gguf'
     target: 'models/text_encoders/Qwen3-4b-Z-Image-Engineer-V4-F16.gguf'
-  - url: 'https://huggingface.co/avatary-ai/files/resolve/main/z_image_bf16.safetensors'
-    target: 'models/diffusion_models/z_image_bf16.safetensors'
   - url: 'https://huggingface.co/avatary-ai/files/resolve/main/z_image_turbo.safetensors'
     target: 'models/diffusion_models/z_image_turbo.safetensors'
   - url: 'https://huggingface.co/avatary-ai/files/resolve/main/z_image_vae.safetensors'
