@@ -54,11 +54,11 @@ RUN set -eux; \
 
 COPY start.sh /start.sh
 COPY install.sh /install.sh
-COPY refresh-nodes-and-models.sh /refresh-nodes-and-models.sh
+COPY update-nodes-and-models.sh /update-nodes-and-models.sh
 COPY restart-comfyui.sh /restart-comfyui.sh
 COPY handlers /handlers
 
-RUN chmod +x /start.sh /install.sh /refresh-nodes-and-models.sh /restart-comfyui.sh
+RUN chmod +x /start.sh /install.sh /update-nodes-and-models.sh /restart-comfyui.sh
 
 EXPOSE 8188 8888
 
