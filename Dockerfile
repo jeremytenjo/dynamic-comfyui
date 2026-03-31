@@ -4,6 +4,7 @@ ENV PYTHONUNBUFFERED=1
 WORKDIR /
 ARG COMFYUI_VERSION=v0.18.2
 ARG COMFYUI_UPDATE_TOKEN=stable
+ARG COMFYUI_UPGRADE=false
 
 RUN apt-get update --yes && \
     DEBIAN_FRONTEND=noninteractive apt-get install --yes --no-install-recommends \
@@ -17,11 +18,13 @@ RUN apt-get update --yes && \
 RUN pip install --no-cache-dir --upgrade pip
 RUN python3 -m pip install --no-cache-dir comfy-cli
 
-RUN echo "ComfyUI update token: ${COMFYUI_UPDATE_TOKEN}" && \
-    noninteractive_args="--skip-prompt" && \
-    comfy --skip-prompt tracking disable >/dev/null 2>&1 || true && \
-    export COMFYUI_INSTALL_VERSION="${COMFYUI_VERSION}" && \
-    COMFYUI_INSTALL_VERSION="$(printf '%s' "${COMFYUI_INSTALL_VERSION}" | tr -d '[:space:]')" && \
+RUN set -eux; \
+    echo "ComfyUI update token: ${COMFYUI_UPDATE_TOKEN}"; \
+    echo "ComfyUI upgrade mode: ${COMFYUI_UPGRADE}"; \
+    noninteractive_args="--skip-prompt"; \
+    comfy --skip-prompt tracking disable >/dev/null 2>&1 || true; \
+    COMFYUI_INSTALL_VERSION="${COMFYUI_VERSION}"; \
+    COMFYUI_INSTALL_VERSION="$(printf '%s' "${COMFYUI_INSTALL_VERSION}" | tr -d '[:space:]')"; \
     if [ -z "${COMFYUI_INSTALL_VERSION}" ]; then \
         COMFYUI_INSTALL_VERSION="v0.18.2"; \
     elif printf '%s' "${COMFYUI_INSTALL_VERSION}" | grep -Eq '^v?[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z]+)*$'; then \
@@ -30,9 +33,15 @@ RUN echo "ComfyUI update token: ${COMFYUI_UPDATE_TOKEN}" && \
         echo "⚠️ COMFYUI_VERSION='${COMFYUI_INSTALL_VERSION}' is legacy; using pinned default v0.18.2."; \
         COMFYUI_INSTALL_VERSION="v0.18.2"; \
     else \
-        echo "❌ COMFYUI_VERSION must be semver (example: 0.18.2 or v0.18.2). Got: '${COMFYUI_INSTALL_VERSION}'." && exit 1; \
-    fi && \
-    comfy ${noninteractive_args} --workspace=/ install --nvidia --skip-torch-or-directml --version "${COMFYUI_INSTALL_VERSION#v}"
+        echo "❌ COMFYUI_VERSION must be semver (example: 0.18.2 or v0.18.2). Got: '${COMFYUI_INSTALL_VERSION}'."; \
+        exit 1; \
+    fi; \
+    if [ -d "/ComfyUI/.git" ] && [ "${COMFYUI_UPGRADE}" != "true" ]; then \
+        echo "ComfyUI already present in base image. Skipping install because COMFYUI_UPGRADE=false."; \
+    else \
+        rm -rf /ComfyUI; \
+        comfy ${noninteractive_args} --workspace=/ install --nvidia --skip-torch-or-directml --version "${COMFYUI_INSTALL_VERSION#v}"; \
+    fi
 
 COPY start.sh /start.sh
 COPY install.sh /install.sh

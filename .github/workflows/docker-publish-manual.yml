@@ -210,6 +210,7 @@ jobs:
           {
             echo "build_args<<EOF"
             echo "COMFYUI_UPDATE_TOKEN=$update_token"
+            echo "COMFYUI_UPGRADE=$INPUT_UPGRADE_COMFYUI"
             if [ -n "$normalized_comfyui_version" ]; then
               echo "COMFYUI_VERSION=$normalized_comfyui_version"
             fi
@@ -217,6 +218,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
           echo "ComfyUI update token: $update_token"
+          echo "ComfyUI upgrade mode: $INPUT_UPGRADE_COMFYUI"
           if [ -n "$normalized_comfyui_version" ]; then
             echo "ComfyUI version override: $normalized_comfyui_version"
           else
