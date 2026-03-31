@@ -39,7 +39,7 @@ install_custom_node_from_git() {
         fi
 
         if ! git -C "$node_path" rev-parse -q --verify "$resolved_ref^{commit}" >/dev/null 2>&1; then
-            echo "⚠️ Pinned $pin_type not found in git repo for $repo_dir: $pin_value"
+            echo "♻️ Pinned $pin_type not found in git repo for $repo_dir: $pin_value"
             return 1
         fi
         if ! git -C "$node_path" checkout -q "$resolved_ref"; then
