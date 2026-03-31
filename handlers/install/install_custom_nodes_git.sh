@@ -1,13 +1,40 @@
 # shellcheck shell=bash
 
 
-install_custom_nodes() {
-    if [ -z "${INSTALL_MANIFEST_CUSTOM_NODES_FILE:-}" ] || [ ! -f "$INSTALL_MANIFEST_CUSTOM_NODES_FILE" ]; then
-        echo "❌ Manifest custom node data is missing. Ensure load_install_manifest ran successfully."
+install_custom_node_from_git() {
+    local repo_dir="$1"
+    local repo_url="$2"
+    local node_path="$CUSTOM_NODES_DIR/$repo_dir"
+
+    if [ -d "$node_path/.git" ]; then
+        echo "🔄 Updating existing git node: $repo_dir"
+        if ! git -C "$node_path" pull --ff-only; then
+            echo "⚠️ Failed to update custom node: $repo_dir"
+            return 1
+        fi
+        return 0
+    fi
+
+    if [ -d "$node_path" ]; then
+        echo "⚠️ Existing non-git directory found for $repo_dir; replacing it."
+        if ! rm -rf "$node_path"; then
+            echo "⚠️ Failed to remove existing custom node directory: $node_path"
+            return 1
+        fi
+    fi
+
+    if ! git clone "$repo_url" "$node_path"; then
+        echo "⚠️ Failed to clone custom node repo: $repo_url"
         return 1
     fi
 
-    if ! ensure_comfy_cli_ready; then
+    return 0
+}
+
+
+install_custom_nodes() {
+    if [ -z "${INSTALL_MANIFEST_CUSTOM_NODES_FILE:-}" ] || [ ! -f "$INSTALL_MANIFEST_CUSTOM_NODES_FILE" ]; then
+        echo "❌ Manifest custom node data is missing. Ensure load_install_manifest ran successfully."
         return 1
     fi
 
@@ -16,84 +43,33 @@ install_custom_nodes() {
         return 1
     fi
 
-    local snapshot_path
-    snapshot_path="$(install_manifest_tmp_dir)/custom-nodes-snapshot.json"
+    local -a custom_node_specs=()
+    local node_line
+    while IFS= read -r node_line; do
+        [ -n "$node_line" ] || continue
+        custom_node_specs+=("$node_line")
+    done < "$INSTALL_MANIFEST_CUSTOM_NODES_FILE"
 
-    if ! python3 - "$INSTALL_MANIFEST_CUSTOM_NODES_FILE" "$snapshot_path" <<'PY'
-import json
-import sys
-
-
-def fail(msg: str) -> None:
-    print(f"❌ {msg}", file=sys.stderr)
-    raise SystemExit(1)
-
-
-if len(sys.argv) != 3:
-    fail("Internal error: expected manifest node TSV and snapshot path.")
-
-manifest_nodes_tsv = sys.argv[1]
-snapshot_path = sys.argv[2]
-
-cnr_custom_nodes = {}
-git_custom_nodes = {}
-
-with open(manifest_nodes_tsv, encoding="utf-8") as f:
-    for line_no, raw_line in enumerate(f, start=1):
-        line = raw_line.rstrip("\n")
-        if not line:
-            continue
-        parts = line.split("\t")
-        if len(parts) != 5:
-            fail(f"Invalid node entry format at line {line_no}.")
-
-        cnr_id, _repo_dir, repo_url, pin_type, pin_value = parts
-
-        # Snapshot restore supports exact CNR version switching by ID.
-        if cnr_id and pin_type == "tag":
-            cnr_custom_nodes[cnr_id] = pin_value
-            continue
-
-        # For non-CNR or commit-pinned entries, let restore-snapshot install from git URL.
-        # Empty hash means clone/update without forcing a checkout hash.
-        git_hash = pin_value if pin_type == "commit" else ""
-        git_custom_nodes[repo_url] = {"hash": git_hash, "disabled": False}
-
-snapshot = {
-    "comfyui": None,
-    "git_custom_nodes": git_custom_nodes,
-    "cnr_custom_nodes": cnr_custom_nodes,
-    "file_custom_nodes": [],
-    "pips": {},
-}
-
-with open(snapshot_path, "w", encoding="utf-8") as out:
-    json.dump(snapshot, out, indent=2)
-PY
-    then
-        return 1
+    if [ "${#custom_node_specs[@]}" -eq 0 ]; then
+        echo "No custom nodes defined in dependencies manifest; skipping node installation."
+        return 0
     fi
 
-    local cnr_count
-    local git_count
-    cnr_count="$(python3 - "$snapshot_path" <<'PY'
-import json, sys
-data = json.load(open(sys.argv[1], encoding="utf-8"))
-print(len(data.get("cnr_custom_nodes", {})))
-PY
-)"
-    git_count="$(python3 - "$snapshot_path" <<'PY'
-import json, sys
-data = json.load(open(sys.argv[1], encoding="utf-8"))
-print(len(data.get("git_custom_nodes", {})))
-PY
-)"
+    local total_custom_nodes=${#custom_node_specs[@]}
+    local node_idx=0
+    local spec
+    for spec in "${custom_node_specs[@]}"; do
+        local repo_dir
+        local repo_url
+        IFS=$'\t' read -r repo_dir repo_url <<< "$spec"
+        node_idx=$((node_idx + 1))
+        echo "⬇️ [$node_idx/$total_custom_nodes] Installing git node $repo_dir"
 
-    echo "Restoring node snapshot from manifest (cnr: $cnr_count, git: $git_count)..."
-    if ! comfy --workspace="$COMFYUI_DIR" node restore-snapshot "$snapshot_path"; then
-        echo "❌ Failed to restore node snapshot."
-        return 1
-    fi
+        if ! install_custom_node_from_git "$repo_dir" "$repo_url"; then
+            echo "❌ Custom node installation failed: $repo_dir"
+            return 1
+        fi
+    done
 
     return 0
 }

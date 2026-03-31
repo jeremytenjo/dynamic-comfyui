@@ -67,34 +67,17 @@ with nodes_file.open("w", encoding="utf-8") as nf:
         if not isinstance(item, dict):
             fail(f"custom_nodes[{idx}] must be a mapping")
 
-        cnr_id = item.get("cnr_id", "")
         repo_dir = item.get("repo_dir")
         repo = item.get("repo")
-        tag = item.get("tag")
-        commit = item.get("commit")
-
-        if cnr_id is None:
-            cnr_id = ""
-        if not isinstance(cnr_id, str):
-            fail(f"custom_nodes[{idx}].cnr_id must be a string when provided")
         if not isinstance(repo_dir, str) or not repo_dir.strip():
             fail(f"custom_nodes[{idx}] requires non-empty string field: repo_dir")
         if not isinstance(repo, str) or not repo.strip():
             fail(f"custom_nodes[{idx}] requires non-empty string field: repo")
 
-        has_tag = isinstance(tag, str) and bool(tag.strip())
-        has_commit = isinstance(commit, str) and bool(commit.strip())
-        if has_tag == has_commit:
-            fail(f"custom_nodes[{idx}] must define exactly one of tag or commit")
-
-        pin_type = "tag" if has_tag else "commit"
-        pin_value = tag.strip() if has_tag else commit.strip()
-        if "\t" in pin_value:
-            fail(f"custom_nodes[{idx}] pin value must not contain tabs")
-        if "\t" in repo_dir or "\t" in repo or "\t" in cnr_id:
+        if "\t" in repo_dir or "\t" in repo:
             fail(f"custom_nodes[{idx}] fields must not contain tabs")
 
-        nf.write(f"{cnr_id}\t{repo_dir.strip()}\t{repo.strip()}\t{pin_type}\t{pin_value}\n")
+        nf.write(f"{repo_dir.strip()}\t{repo.strip()}\n")
 
 with models_file.open("w", encoding="utf-8") as mf:
     for idx, item in enumerate(models):
