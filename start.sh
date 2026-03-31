@@ -1,18 +1,11 @@
 #!/usr/bin/env bash
 
-# Use libtcmalloc for better memory management
-TCMALLOC="$(ldconfig -p | grep -Po "libtcmalloc.so.\d" | head -n 1)"
-export LD_PRELOAD="${TCMALLOC}"
-
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-for handler_file in "$SCRIPT_DIR"/handlers/start/*.sh; do
-    # shellcheck source=/dev/null
-    source "$handler_file"
-done
-for handler_file in "$SCRIPT_DIR"/handlers/install/*.sh; do
-    # shellcheck source=/dev/null
-    source "$handler_file"
-done
+source "$SCRIPT_DIR"/handlers/shared/entrypoint_utils.sh
+
+enable_tcmalloc_preload
+source_start_handlers "$SCRIPT_DIR"
+source_install_handlers "$SCRIPT_DIR"
 
 # Set the network volume path
 NETWORK_VOLUME="/workspace"

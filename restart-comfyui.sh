@@ -2,10 +2,10 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-for handler_file in "$SCRIPT_DIR"/handlers/install/*.sh; do
-    # shellcheck source=/dev/null
-    source "$handler_file"
-done
+source "$SCRIPT_DIR"/handlers/shared/entrypoint_utils.sh
+
+enable_tcmalloc_preload
+source_install_handlers "$SCRIPT_DIR"
 
 NETWORK_VOLUME="${NETWORK_VOLUME:-/workspace}"
 export NETWORK_VOLUME

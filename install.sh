@@ -1,27 +1,15 @@
 #!/usr/bin/env bash
 
-# Use libtcmalloc for better memory management
-TCMALLOC="$(ldconfig -p | grep -Po "libtcmalloc.so.\d" | head -n 1)"
-export LD_PRELOAD="${TCMALLOC}"
-
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-for handler_file in "$SCRIPT_DIR"/handlers/install/*.sh; do
-    # shellcheck source=/dev/null
-    source "$handler_file"
-done
+source "$SCRIPT_DIR"/handlers/shared/entrypoint_utils.sh
+
+enable_tcmalloc_preload
+source_install_handlers "$SCRIPT_DIR"
 
 NETWORK_VOLUME="/workspace"
 export INSTALL_START_TS
 INSTALL_START_TS=$(date +%s)
-set_install_manifest_url_default
-
-set_network_volume_default
-
-if ! load_install_manifest; then
-    exit 1
-fi
-
-if ! ensure_comfyui_workspace; then
+if ! prepare_manifest_install_context; then
     exit 1
 fi
 
@@ -31,12 +19,6 @@ if ! install_comfyui_with_comfy_cli; then
 fi
 
 if ! cleanup_comfyui_invalid_backup; then
-    exit 1
-fi
-
-set_model_directories
-
-if ! require_install_tools; then
     exit 1
 fi
 
