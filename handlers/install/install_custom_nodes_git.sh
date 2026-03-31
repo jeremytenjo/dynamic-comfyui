@@ -4,7 +4,6 @@
 install_custom_nodes_with_comfy_cli() {
     local -a custom_node_specs=(
         "comfyui-manager|comfyui-manager|https://github.com/Comfy-Org/ComfyUI-Manager.git|3.0.1"
-        "was-ns|was-node-suite-comfyui|https://github.com/ltdrdata/was-node-suite-comfyui|3.0.1"
         "comfyui-rmbg|ComfyUI-RMBG|https://github.com/1038lab/ComfyUI-RMBG.git|3.0.0"
         "comfyui-inpaint-cropandstitch|ComfyUI-Inpaint-CropAndStitch|https://github.com/lquesada/ComfyUI-Inpaint-CropAndStitch.git|3.0.10"
         "ComfyUI-GGUF|ComfyUI-GGUF|https://github.com/city96/ComfyUI-GGUF.git|1.1.10"
