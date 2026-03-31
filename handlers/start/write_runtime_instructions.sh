@@ -11,6 +11,10 @@ Requirements:
 
 L40S GPU
 
+First Time Setup:
+
+Save your character lora in the /ComfyUI/models/lora folder.
+
 Usage: 
 
 Run this command in the terminal to start ComfyUI `bash install.sh`
