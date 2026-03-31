@@ -21,6 +21,18 @@ custom_nodes:
     repo: 'https://github.com/chrisgoringe/cg-use-everywhere'
   - repo_dir: 'ComfyUI-NAG'
     repo: 'https://github.com/jeremytenjo/ComfyUI-NAG'
+  - repo_dir: 'ComfyUI-GlifNodes'
+    repo: 'https://github.com/glifxyz/ComfyUI-GlifNodes'
+  - repo_dir: 'ComfyUI-Impact-Pack'
+    repo: 'https://github.com/ltdrdata/ComfyUI-Impact-Pack'
+  - repo_dir: 'ComfyUI-Impact-Subpack'
+    repo: 'https://github.com/ltdrdata/ComfyUI-Impact-Subpack'
+  - repo_dir: 'ComfyUI-Inspire-Pack'
+    repo: 'https://github.com/ltdrdata/ComfyUI-Inspire-Pack'
+  - repo_dir: 'rgthree-comfy'
+    repo: 'https://github.com/rgthree/rgthree-comfy'
+  - repo_dir: 'was-node-suite-comfyui'
+    repo: 'https://github.com/ltdrdata/was-node-suite-comfyui'
 
 models:
   - url: 'https://huggingface.co/avatary-ai/files/resolve/main/ae.safetensors'
