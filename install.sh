@@ -28,8 +28,8 @@ fi
 
 clear_install_sentinel
 
-echo "Ensuring required custom nodes are installed via git clone..."
-if ! install_custom_nodes_with_git; then
+echo "Ensuring required custom nodes are installed via comfy-cli..."
+if ! install_custom_nodes_with_comfy_cli; then
     echo "Custom node installation failed."
     exit 1
 fi

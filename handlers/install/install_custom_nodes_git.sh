@@ -1,43 +1,27 @@
 # shellcheck shell=bash
 
 
-pip_install_requirements_file() {
-    local requirements_file="$1"
-    if ! python3 -m pip install --no-cache-dir --break-system-packages -r "$requirements_file"; then
-        python3 -m pip install --no-cache-dir -r "$requirements_file"
-    fi
-}
-
-
-clone_or_update_custom_node_repo() {
-    local repo_url="$1"
-    local repo_dir="$2"
-    local pinned_version="$3"
-    local node_path="$CUSTOM_NODES_DIR/$repo_dir"
-
-    if [ -d "$node_path/.git" ]; then
-        git -C "$node_path" fetch --all --tags --prune
-        git -C "$node_path" checkout --quiet main || git -C "$node_path" checkout --quiet master
-        git -C "$node_path" pull --ff-only
-    else
-        rm -rf "$node_path"
-        git clone "$repo_url" "$node_path"
+ensure_comfy_cli_ready() {
+    if command -v comfy > /dev/null 2>&1; then
+        return 0
     fi
 
-    if [ -f "$node_path/requirements.txt" ]; then
-        echo "📦 Installing Python deps for $repo_dir"
-        if ! pip_install_requirements_file "$node_path/requirements.txt"; then
-            echo "❌ Failed installing requirements for $repo_dir"
-            return 1
-        fi
+    echo "Installing comfy-cli..."
+    if ! python3 -m pip install --no-cache-dir comfy-cli; then
+        echo "❌ Failed to install comfy-cli."
+        return 1
     fi
 
-    echo "$pinned_version" > "$node_path/.cnr-version"
+    if ! command -v comfy > /dev/null 2>&1; then
+        echo "❌ comfy-cli installation completed but 'comfy' command is not available."
+        return 1
+    fi
+
     return 0
 }
 
 
-install_custom_nodes_with_git() {
+install_custom_nodes_with_comfy_cli() {
     local -a custom_node_specs=(
         "comfyui-manager|comfyui-manager|https://github.com/Comfy-Org/ComfyUI-Manager.git|3.0.1"
         "was-ns|was-node-suite-comfyui|https://github.com/WASasquatch/was-node-suite-comfyui.git|3.0.1"
@@ -50,20 +34,35 @@ install_custom_nodes_with_git() {
         "comfyui_essentials|ComfyUI_essentials|https://github.com/cubiq/ComfyUI_essentials.git|1.1.0"
     )
 
+    if ! ensure_comfy_cli_ready; then
+        return 1
+    fi
+
+    if ! cd "$COMFYUI_DIR"; then
+        echo "❌ Failed to cd into ComfyUI workspace: $COMFYUI_DIR"
+        return 1
+    fi
+
     local total_custom_nodes=${#custom_node_specs[@]}
     local custom_node_idx=0
     local custom_node_spec
     for custom_node_spec in "${custom_node_specs[@]}"; do
         local cnr_id
         local repo_dir
-        local repo_url
+        local unused_repo_url
         local pinned_version
-        IFS='|' read -r cnr_id repo_dir repo_url pinned_version <<< "$custom_node_spec"
+        IFS='|' read -r cnr_id repo_dir unused_repo_url pinned_version <<< "$custom_node_spec"
         custom_node_idx=$((custom_node_idx + 1))
-        echo "⬇️ [$custom_node_idx/$total_custom_nodes] Cloning $repo_dir (target $cnr_id@$pinned_version)"
-        if ! clone_or_update_custom_node_repo "$repo_url" "$repo_dir" "$pinned_version"; then
-            echo "❌ Failed to install custom node via git: $repo_dir"
+        echo "⬇️ [$custom_node_idx/$total_custom_nodes] Installing $cnr_id via comfy-cli (target $repo_dir@$pinned_version)"
+
+        if ! comfy --workspace="$COMFYUI_DIR" node install "$cnr_id"; then
+            echo "❌ Failed to install custom node via comfy-cli: $cnr_id"
             return 1
+        fi
+
+        local node_path="$CUSTOM_NODES_DIR/$repo_dir"
+        if [ -d "$node_path" ]; then
+            echo "$pinned_version" > "$node_path/.cnr-version"
         fi
     done
 
