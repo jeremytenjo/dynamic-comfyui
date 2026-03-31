@@ -13,8 +13,14 @@ done
 NETWORK_VOLUME="/workspace"
 export INSTALL_START_TS
 INSTALL_START_TS=$(date +%s)
+INSTALL_MANIFEST_PATH="$SCRIPT_DIR/config/install-manifest.yaml"
+export INSTALL_MANIFEST_PATH
 
 set_network_volume_default
+
+if ! load_install_manifest; then
+    exit 1
+fi
 
 if ! ensure_comfyui_workspace; then
     exit 1

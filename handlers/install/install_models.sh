@@ -63,20 +63,22 @@ download_model_with_comfy_cli() {
 
 
 install_models_with_comfy_cli() {
-    local -a model_specs=(
-        "https://huggingface.co/avatary-ai/files/resolve/main/ae.safetensors|$VAE_DIR/ae.safetensors"
-        "https://huggingface.co/avatary-ai/files/resolve/main/qwen_3_4b.safetensors|$TEXT_ENCODERS_DIR/qwen_3_4b.safetensors"
-        "https://huggingface.co/avatary-ai/files/resolve/main/Qwen3-4b-Z-Image-Engineer-V4-F16.gguf|$TEXT_ENCODERS_DIR/Qwen3-4b-Z-Image-Engineer-V4-F16.gguf"
-        "https://huggingface.co/avatary-ai/files/resolve/main/z_image_bf16.safetensors|$DIFFUSION_MODELS_DIR/z_image_bf16.safetensors"
-        "https://huggingface.co/avatary-ai/files/resolve/main/z_image_turbo_bf16.safetensors|$DIFFUSION_MODELS_DIR/z_image_turbo.safetensors"
-        "https://huggingface.co/avatary-ai/files/resolve/main/z_image_turbo.safetensors|$DIFFUSION_MODELS_DIR/z-image-turbo-nsfw.safetensors"
-        "https://huggingface.co/avatary-ai/files/resolve/main/z_image_vae.safetensors|$VAE_DIR/z_image_vae.safetensors"
-        "https://huggingface.co/avatary-ai/files/resolve/main/Z-Image-AbliteratedV1.f16.gguf|$TEXT_ENCODERS_DIR/Z-Image-AbliteratedV1.f16.gguf"
-        "https://huggingface.co/avatary-ai/files/resolve/main/Z-Image-AbliteratedV1.f16.safetensors|$TEXT_ENCODERS_DIR/Z-Image-AbliteratedV1.f16.safetensors"
-        "https://huggingface.co/avatary-ai/files/resolve/main/seedvr2_ema_7b_fp16.safetensors|$SEEDVR2_DIR/seedvr2_ema_7b_fp16.safetensors"
-        "https://huggingface.co/avatary-ai/files/resolve/main/ema_vae_fp16.safetensors|$SEEDVR2_DIR/ema_vae_fp16.safetensors"
-        "https://huggingface.co/avatary-ai/files/resolve/main/sam3.pt|$SAM3_DIR/sam3.pt"
-    )
+    if [ -z "${INSTALL_MANIFEST_MODELS_FILE:-}" ] || [ ! -f "$INSTALL_MANIFEST_MODELS_FILE" ]; then
+        echo "❌ Manifest model data is missing. Ensure load_install_manifest ran successfully."
+        return 1
+    fi
+
+    local -a model_specs=()
+    local model_line
+    while IFS= read -r model_line; do
+        [ -n "$model_line" ] || continue
+        model_specs+=("$model_line")
+    done < "$INSTALL_MANIFEST_MODELS_FILE"
+
+    if [ "${#model_specs[@]}" -eq 0 ]; then
+        echo "No models defined in install manifest; skipping model installation."
+        return 0
+    fi
 
     if ! ensure_comfy_cli_ready; then
         echo "❌ comfy-cli is not available."
@@ -98,8 +100,11 @@ install_models_with_comfy_cli() {
     local model_spec
     for model_spec in "${model_specs[@]}"; do
         local model_url
+        local model_target
         local model_path
-        IFS='|' read -r model_url model_path <<< "$model_spec"
+        IFS=$'\t' read -r model_url model_target <<< "$model_spec"
+        model_path="$COMFYUI_DIR/$model_target"
+        mkdir -p "$(dirname "$model_path")"
         model_idx=$((model_idx + 1))
         echo "⬇️ [$model_idx/$total_models] Queueing $(basename "$model_path")"
         download_model_with_comfy_cli "$model_url" "$model_path" &
