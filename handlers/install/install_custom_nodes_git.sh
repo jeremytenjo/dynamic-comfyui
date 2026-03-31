@@ -3,14 +3,12 @@
 install_custom_node_from_git() {
     local repo_dir="$1"
     local repo_url="$2"
-    local pin_type="$3"
-    local pin_value="$4"
     local node_path="$CUSTOM_NODES_DIR/$repo_dir"
 
     if [ -d "$node_path/.git" ]; then
         echo "🔄 Updating existing git node: $repo_dir"
-        if ! git -C "$node_path" fetch --tags --prune origin; then
-            echo "⚠️ Failed to fetch updates for custom node: $repo_dir"
+        if ! git -C "$node_path" pull --ff-only; then
+            echo "⚠️ Failed to update custom node: $repo_dir"
             return 1
         fi
     elif [ -d "$node_path" ]; then
@@ -28,25 +26,6 @@ install_custom_node_from_git() {
             echo "⚠️ Failed to clone custom node repo: $repo_url"
             return 1
         fi
-    fi
-
-    if [ -n "$pin_value" ]; then
-        local resolved_ref="$pin_value"
-        if [ "$pin_type" = "tag" ]; then
-            if ! git -C "$node_path" rev-parse -q --verify "$resolved_ref^{commit}" >/dev/null 2>&1; then
-                resolved_ref="v$pin_value"
-            fi
-        fi
-
-        if ! git -C "$node_path" rev-parse -q --verify "$resolved_ref^{commit}" >/dev/null 2>&1; then
-            echo "♻️ Pinned $pin_type not found in git repo for $repo_dir: $pin_value"
-            return 1
-        fi
-        if ! git -C "$node_path" checkout -q "$resolved_ref"; then
-            echo "⚠️ Failed to checkout pinned $pin_type $resolved_ref for $repo_dir"
-            return 1
-        fi
-        echo "$pin_value" > "$node_path/.cnr-version"
     fi
 
     return 0
@@ -105,14 +84,14 @@ install_custom_nodes() {
                     echo "$comfy_output"
                 fi
                 echo "⚠️ comfy-cli install failed for $cnr_id; trying git fallback: $repo_url"
-                if ! install_custom_node_from_git "$repo_dir" "$repo_url" "$pin_type" "$pin_value"; then
+                if ! install_custom_node_from_git "$repo_dir" "$repo_url"; then
                     echo "⚠️ Git fallback failed for $repo_dir"
                     return 1
                 fi
                 used_git_fallback=1
             fi
         else
-            if ! install_custom_node_from_git "$repo_dir" "$repo_url" "$pin_type" "$pin_value"; then
+            if ! install_custom_node_from_git "$repo_dir" "$repo_url"; then
                 echo "⚠️ Git install failed for $repo_dir"
                 return 1
             fi
