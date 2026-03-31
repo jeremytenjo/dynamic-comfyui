@@ -2,7 +2,7 @@ FROM runpod/pytorch:1.0.2-cu1281-torch280-ubuntu2404
 
 ENV PYTHONUNBUFFERED=1
 WORKDIR /
-ARG COMFYUI_VERSION=
+ARG COMFYUI_VERSION=v0.18.2
 ARG COMFYUI_UPDATE_TOKEN=stable
 
 RUN apt-get update --yes && \
@@ -18,11 +18,18 @@ RUN pip install --no-cache-dir --upgrade pip
 RUN python3 -m pip install --no-cache-dir comfy-cli
 
 RUN echo "ComfyUI update token: ${COMFYUI_UPDATE_TOKEN}" && \
+    noninteractive_args="--skip-prompt" && \
+    comfy --skip-prompt tracking disable >/dev/null 2>&1 || true && \
     export COMFYUI_INSTALL_VERSION="${COMFYUI_VERSION}" && \
     if [ -z "${COMFYUI_INSTALL_VERSION}" ]; then \
-        comfy --skip-prompt --workspace=/ install --nvidia --skip-torch-or-directml --version latest; \
+        case "${COMFYUI_UPDATE_TOKEN}" in \
+            nightly) COMFYUI_INSTALL_VERSION="nightly" ;; \
+            stable|latest|"") COMFYUI_INSTALL_VERSION="latest" ;; \
+            *) echo "❌ COMFYUI_UPDATE_TOKEN must be one of: stable, latest, nightly." && exit 1 ;; \
+        esac; \
+        comfy ${noninteractive_args} --workspace=/ install --nvidia --skip-torch-or-directml --version "${COMFYUI_INSTALL_VERSION}"; \
     elif printf '%s' "${COMFYUI_INSTALL_VERSION}" | grep -Eq '^v?[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z]+)*$'; then \
-        comfy --skip-prompt --workspace=/ install --nvidia --skip-torch-or-directml --version "${COMFYUI_INSTALL_VERSION#v}"; \
+        comfy ${noninteractive_args} --workspace=/ install --nvidia --skip-torch-or-directml --version "${COMFYUI_INSTALL_VERSION#v}"; \
     else \
         echo "❌ COMFYUI_VERSION must be semver (example: 0.3.39 or v0.3.39)." && exit 1; \
     fi

@@ -32,7 +32,7 @@ on:
         type: boolean
         default: false
       comfyui_version:
-        description: 'Optional ComfyUI version in semver format (example: 0.3.39 or v0.3.39). Leave empty to use latest.'
+        description: 'Optional ComfyUI version in semver format (example: 0.3.39 or v0.3.39). Leave empty to use default v0.18.2.'
         required: false
         type: string
 
