@@ -37,8 +37,12 @@ fi
 
 clear_install_sentinel
 
-echo "Ensuring required custom nodes are installed via comfy-cli..."
-if ! install_custom_nodes_with_comfy_cli; then
+if ! enable_comfyui_manager_modern_ui; then
+    exit 1
+fi
+
+echo "Ensuring required custom nodes are installed via comfy-git..."
+if ! install_custom_nodes; then
     echo "Custom node installation failed."
     exit 1
 fi

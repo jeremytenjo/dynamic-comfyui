@@ -1,7 +1,71 @@
 # shellcheck shell=bash
 
+enable_comfyui_manager_modern_ui() {
+    if ! ensure_comfy_cli_ready; then
+        return 1
+    fi
 
-install_custom_nodes_with_comfy_cli() {
+    echo "Enabling ComfyUI-Manager modern UI..."
+    if ! comfy --workspace="$COMFYUI_DIR" manager enable-gui; then
+        echo "❌ Failed to enable ComfyUI-Manager modern UI."
+        return 1
+    fi
+
+    return 0
+}
+
+install_custom_node_from_git() {
+    local repo_dir="$1"
+    local repo_url="$2"
+    local pinned_version="$3"
+    local node_path="$CUSTOM_NODES_DIR/$repo_dir"
+
+    if [ -d "$node_path/.git" ]; then
+        echo "🔄 Updating existing git node: $repo_dir"
+        if ! git -C "$node_path" fetch --tags --prune origin; then
+            echo "❌ Failed to fetch updates for custom node: $repo_dir"
+            return 1
+        fi
+    elif [ -d "$node_path" ]; then
+        echo "⚠️ Existing non-git directory found for $repo_dir; replacing it."
+        if ! rm -rf "$node_path"; then
+            echo "❌ Failed to remove existing custom node directory: $node_path"
+            return 1
+        fi
+        if ! git clone "$repo_url" "$node_path"; then
+            echo "❌ Failed to clone custom node repo: $repo_url"
+            return 1
+        fi
+    else
+        if ! git clone "$repo_url" "$node_path"; then
+            echo "❌ Failed to clone custom node repo: $repo_url"
+            return 1
+        fi
+    fi
+
+    if [ -n "$pinned_version" ]; then
+        if git -C "$node_path" rev-parse -q --verify "$pinned_version^{commit}" >/dev/null 2>&1; then
+            if ! git -C "$node_path" checkout -q "$pinned_version"; then
+                echo "❌ Failed to checkout pinned version $pinned_version for $repo_dir"
+                return 1
+            fi
+        elif git -C "$node_path" rev-parse -q --verify "v$pinned_version^{commit}" >/dev/null 2>&1; then
+            if ! git -C "$node_path" checkout -q "v$pinned_version"; then
+                echo "❌ Failed to checkout pinned version v$pinned_version for $repo_dir"
+                return 1
+            fi
+        else
+            echo "❌ Pinned version not found in git repo for $repo_dir: $pinned_version"
+            return 1
+        fi
+        echo "$pinned_version" > "$node_path/.cnr-version"
+    fi
+
+    return 0
+}
+
+
+install_custom_nodes() {
     local -a custom_node_specs=(
         "comfyui-manager|comfyui-manager|https://github.com/Comfy-Org/ComfyUI-Manager.git|3.0.1"
         "comfyui-rmbg|ComfyUI-RMBG|https://github.com/1038lab/ComfyUI-RMBG.git|3.0.0"
@@ -29,13 +93,25 @@ install_custom_nodes_with_comfy_cli() {
     for custom_node_spec in "${custom_node_specs[@]}"; do
         local cnr_id
         local repo_dir
-        local unused_repo_url
+        local repo_url
         local pinned_version
-        IFS='|' read -r cnr_id repo_dir unused_repo_url pinned_version <<< "$custom_node_spec"
+        local comfy_output
+        IFS='|' read -r cnr_id repo_dir repo_url pinned_version <<< "$custom_node_spec"
         custom_node_idx=$((custom_node_idx + 1))
         echo "⬇️ [$custom_node_idx/$total_custom_nodes] Installing $cnr_id via comfy-cli (target $repo_dir@$pinned_version)"
 
-        if ! comfy --workspace="$COMFYUI_DIR" node install "$cnr_id"; then
+        comfy_output="$(comfy --workspace="$COMFYUI_DIR" node install "$cnr_id" 2>&1)"
+        if [ $? -ne 0 ]; then
+            if printf '%s' "$comfy_output" | grep -qiE "not found|@unknown|custom-node-list\.json"; then
+                echo "⚠️ $cnr_id is not resolvable in comfy registry; falling back to git: $repo_url"
+                if ! install_custom_node_from_git "$repo_dir" "$repo_url" "$pinned_version"; then
+                    echo "❌ Failed to install custom node via git fallback: $repo_dir"
+                    return 1
+                fi
+                continue
+            fi
+
+            echo "$comfy_output"
             echo "❌ Failed to install custom node via comfy-cli: $cnr_id"
             return 1
         fi
