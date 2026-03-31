@@ -25,6 +25,10 @@ if ! install_comfyui_with_comfy_cli; then
     exit 1
 fi
 
+if ! cleanup_comfyui_invalid_backup; then
+    exit 1
+fi
+
 set_model_directories
 
 if ! require_install_tools; then
