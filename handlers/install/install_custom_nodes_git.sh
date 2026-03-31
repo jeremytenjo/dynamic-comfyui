@@ -86,6 +86,7 @@ install_custom_nodes() {
         local repo_url
         local pinned_version
         local comfy_output
+        local used_git_fallback=0
         IFS='|' read -r cnr_id repo_dir repo_url pinned_version <<< "$spec"
 
         comfy_output="$(comfy --workspace="$COMFYUI_DIR" node install "$cnr_id" 2>&1)"
@@ -94,14 +95,15 @@ install_custom_nodes() {
                 echo "$comfy_output"
             fi
             echo "⚠️ comfy-cli install failed for $cnr_id; trying git fallback: $repo_url"
-            if ! install_custom_node_from_git "$repo_dir" "$repo_url" "$pinned_version"; then
+            if ! install_custom_node_from_git "$repo_dir" "$repo_url" ""; then
                 echo "⚠️ Git fallback failed for $repo_dir"
                 return 1
             fi
+            used_git_fallback=1
         fi
 
         local node_path="$CUSTOM_NODES_DIR/$repo_dir"
-        if [ -d "$node_path" ]; then
+        if [ "$used_git_fallback" -eq 0 ] && [ -d "$node_path" ]; then
             echo "$pinned_version" > "$node_path/.cnr-version"
         fi
 
