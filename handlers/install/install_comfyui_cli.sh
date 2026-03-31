@@ -39,6 +39,9 @@ ensure_comfy_cli_ready() {
         return 1
     fi
 
+    # Keep automation non-interactive by disabling telemetry prompt.
+    comfy tracking disable > /dev/null 2>&1 || true
+
     return 0
 }
 

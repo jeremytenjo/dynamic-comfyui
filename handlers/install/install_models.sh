@@ -25,12 +25,7 @@ download_model_with_comfy_cli() {
         fi
     fi
 
-    if [ -z "${HUGGINGFACE_TOKEN:-}" ]; then
-        echo "⚠️  HUGGINGFACE_TOKEN not set; downloading without HF auth token."
-        comfy --workspace="$COMFYUI_DIR" model download --url "$url" --relative-path "$relative_path" || rc=$?
-    else
-        HF_API_TOKEN="$HUGGINGFACE_TOKEN" comfy --workspace="$COMFYUI_DIR" model download --url "$url" --relative-path "$relative_path" || rc=$?
-    fi
+    comfy --workspace="$COMFYUI_DIR" model download --url "$url" --relative-path "$relative_path" || rc=$?
 
     local size_bytes
     local end_ts
@@ -67,6 +62,14 @@ install_models_with_comfy_cli() {
     if ! ensure_comfy_cli_ready; then
         echo "❌ comfy-cli is not available."
         return 1
+    fi
+
+    # comfy-cli uses HF_API_TOKEN for Hugging Face auth; map legacy env var once.
+    if [ -n "${HUGGINGFACE_TOKEN:-}" ] && [ -z "${HF_API_TOKEN:-}" ]; then
+        export HF_API_TOKEN="$HUGGINGFACE_TOKEN"
+    fi
+    if [ -z "${HF_API_TOKEN:-}" ]; then
+        echo "⚠️  HF_API_TOKEN not set; downloading without HF auth token."
     fi
 
     local total_models=${#model_specs[@]}
