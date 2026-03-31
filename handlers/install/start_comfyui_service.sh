@@ -8,8 +8,22 @@ start_comfyui_service() {
     local -a comfy_args=(--listen --enable-manager --disable-cuda-malloc)
 
     if curl --silent --fail "$comfy_health_url" --output /dev/null; then
-        echo "✅ ComfyUI is already running."
-        return 0
+        echo "ComfyUI is already running; restarting to load newly installed models and custom nodes."
+        local -a existing_pids=()
+        while IFS= read -r pid; do
+            [ -n "$pid" ] && existing_pids+=("$pid")
+        done < <(ps -eo pid=,args= | awk '/[p]ython3 .*main\.py/ {print $1}')
+
+        if [ "${#existing_pids[@]}" -gt 0 ]; then
+            kill "${existing_pids[@]}" 2>/dev/null || true
+            sleep 3
+            local pid
+            for pid in "${existing_pids[@]}"; do
+                if kill -0 "$pid" 2>/dev/null; then
+                    kill -9 "$pid" 2>/dev/null || true
+                fi
+            done
+        fi
     fi
 
     stop_setup_instructions_page
@@ -23,7 +37,11 @@ start_comfyui_service() {
     fi
 
     echo "Starting ComfyUI"
-    nohup python3 "$COMFYUI_DIR/main.py" "${comfy_args[@]}" > "$comfy_log_path" 2>&1 &
+    if ! cd "$COMFYUI_DIR"; then
+        echo "Failed to cd into ComfyUI workspace: $COMFYUI_DIR"
+        return 1
+    fi
+    nohup python3 main.py "${comfy_args[@]}" > "$comfy_log_path" 2>&1 &
     local comfy_pid=$!
 
     local counter=0
