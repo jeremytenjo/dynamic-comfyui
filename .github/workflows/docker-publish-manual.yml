@@ -27,12 +27,12 @@ on:
         type: string
         default: avatary-image-generator-v1
       upgrade_comfyui:
-        description: 'Force refresh ComfyUI layer (use to upgrade from latest ref)'
+        description: 'Force refresh ComfyUI layer (use to upgrade from latest version)'
         required: true
         type: boolean
         default: false
-      comfyui_ref:
-        description: 'Optional ComfyUI git ref (branch/tag/commit). Leave empty to use Dockerfile default.'
+      comfyui_version:
+        description: 'Optional ComfyUI version in semver format (example: 0.3.39 or v0.3.39). Leave empty to use Dockerfile default.'
         required: false
         type: string
 
@@ -185,30 +185,42 @@ jobs:
         id: comfyui
         env:
           INPUT_UPGRADE_COMFYUI: ${{ inputs.upgrade_comfyui }}
-          INPUT_COMFYUI_REF: ${{ inputs.comfyui_ref }}
+          INPUT_COMFYUI_VERSION: ${{ inputs.comfyui_version }}
           GITHUB_RUN_ID: ${{ github.run_id }}
         run: |
           set -euo pipefail
 
           update_token="stable"
+          semver_pattern='^v?[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z]+)*$'
+          comfyui_version="${INPUT_COMFYUI_VERSION:-}"
+          normalized_comfyui_version=""
+
           if [ "$INPUT_UPGRADE_COMFYUI" = "true" ]; then
             update_token="$GITHUB_RUN_ID"
+          fi
+
+          if [ -n "$comfyui_version" ]; then
+            if ! [[ "$comfyui_version" =~ $semver_pattern ]]; then
+              echo "Invalid comfyui_version: '$comfyui_version'. Expected semver, e.g. 0.3.39 or v0.3.39."
+              exit 1
+            fi
+            normalized_comfyui_version="${comfyui_version#v}"
           fi
 
           {
             echo "build_args<<EOF"
             echo "COMFYUI_UPDATE_TOKEN=$update_token"
-            if [ -n "$INPUT_COMFYUI_REF" ]; then
-              echo "COMFYUI_REF=$INPUT_COMFYUI_REF"
+            if [ -n "$normalized_comfyui_version" ]; then
+              echo "COMFYUI_VERSION=$normalized_comfyui_version"
             fi
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
 
           echo "ComfyUI update token: $update_token"
-          if [ -n "$INPUT_COMFYUI_REF" ]; then
-            echo "ComfyUI ref override: $INPUT_COMFYUI_REF"
+          if [ -n "$normalized_comfyui_version" ]; then
+            echo "ComfyUI version override: $normalized_comfyui_version"
           else
-            echo "ComfyUI ref override: <none> (Dockerfile default)"
+            echo "ComfyUI version override: <none> (Dockerfile default)"
           fi
 
       - name: Build and push version tag

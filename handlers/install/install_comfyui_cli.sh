@@ -117,21 +117,31 @@ cleanup_comfyui_invalid_backup() {
 }
 
 
-install_comfyui_core_from_git() {
+install_comfyui_core_with_comfy_cli() {
     if is_comfyui_workspace_sane "$COMFYUI_DIR"; then
         echo "ComfyUI core already present at $COMFYUI_DIR; skipping clone."
         return 0
     fi
 
-    echo "Installing ComfyUI core via git clone..."
-    if ! git clone https://github.com/comfyanonymous/ComfyUI.git "$COMFYUI_DIR"; then
-        echo "❌ Failed to clone ComfyUI repo into $COMFYUI_DIR"
+    local install_version="${COMFYUI_VERSION:-}"
+    local -a comfy_install_cmd=(comfy)
+    while IFS= read -r arg; do
+        [ -n "$arg" ] && comfy_install_cmd+=("$arg")
+    done < <(comfy_global_noninteractive_args)
+    comfy_install_cmd+=(--workspace="$NETWORK_VOLUME" install --nvidia --skip-torch-or-directml)
+
+    if [ -z "$install_version" ]; then
+        comfy_install_cmd+=(--version nightly)
+    elif printf '%s' "$install_version" | grep -Eq '^v?[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z]+)*$'; then
+        comfy_install_cmd+=(--version "${install_version#v}")
+    else
+        echo "❌ COMFYUI_VERSION must be semver (example: 0.3.39 or v0.3.39)."
         return 1
     fi
 
-    echo "Installing ComfyUI Python requirements..."
-    if ! python3 -m pip install --no-cache-dir -r "$COMFYUI_DIR/requirements.txt"; then
-        echo "❌ Failed to install ComfyUI requirements."
+    echo "Installing ComfyUI core via comfy-cli (version: ${install_version:-nightly})..."
+    if ! "${comfy_install_cmd[@]}"; then
+        echo "❌ Failed to install ComfyUI via comfy-cli."
         return 1
     fi
 
@@ -148,7 +158,7 @@ install_comfyui_with_comfy_cli() {
         return 1
     fi
 
-    if ! install_comfyui_core_from_git; then
+    if ! install_comfyui_core_with_comfy_cli; then
         return 1
     fi
 
