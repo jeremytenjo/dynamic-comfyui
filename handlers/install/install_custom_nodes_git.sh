@@ -1,26 +1,6 @@
 # shellcheck shell=bash
 
 
-ensure_comfy_cli_ready() {
-    if command -v comfy > /dev/null 2>&1; then
-        return 0
-    fi
-
-    echo "Installing comfy-cli..."
-    if ! python3 -m pip install --no-cache-dir comfy-cli; then
-        echo "❌ Failed to install comfy-cli."
-        return 1
-    fi
-
-    if ! command -v comfy > /dev/null 2>&1; then
-        echo "❌ comfy-cli installation completed but 'comfy' command is not available."
-        return 1
-    fi
-
-    return 0
-}
-
-
 install_custom_nodes_with_comfy_cli() {
     local -a custom_node_specs=(
         "comfyui-manager|comfyui-manager|https://github.com/Comfy-Org/ComfyUI-Manager.git|3.0.1"

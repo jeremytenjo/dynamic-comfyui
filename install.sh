@@ -20,6 +20,11 @@ if ! ensure_comfyui_workspace; then
     exit 1
 fi
 
+echo "Installing ComfyUI with comfy-cli..."
+if ! install_comfyui_with_comfy_cli; then
+    exit 1
+fi
+
 set_model_directories
 
 if ! require_install_tools; then
