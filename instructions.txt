@@ -1,12 +1,14 @@
-Avatary Image Generator v1
+ComfyUI Commands
 
-Usage Instructions:
+Use these from a terminal in this container.
 
-bash /install.sh
-   
-Runs one-time/full setup: installs or updates ComfyUI, installs required custom nodes and models, 
-enables Manager UI, then starts ComfyUI.
+1. First-time setup or full update
+   Command: bash /install.sh
+   What it does: Installs/updates ComfyUI, installs required custom nodes and models, enables ComfyUI-Manager modern UI, and starts ComfyUI.
+   When to use: First run, after image/template updates, or when you need to refresh installed dependencies.
 
-bash /restart-comfyui.sh
-
-Restarts the ComfyUI service only (stop/start + health check). It does not reinstall models or custom nodes.
+2. Restart ComfyUI service only
+   Command: bash /restart-comfyui.sh
+   What it does: Stops and starts ComfyUI, then waits for health check success.
+   When to use: After changing runtime settings or if ComfyUI becomes unresponsive.
+   Note: Does NOT reinstall models or custom nodes.
