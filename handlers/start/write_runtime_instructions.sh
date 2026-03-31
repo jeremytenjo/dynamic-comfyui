@@ -13,9 +13,9 @@ L40S GPU
 
 Usage: 
 
-Run this command in the terminal to start ComfyUI `bash /install.sh`
+Run this command in the terminal to start ComfyUI `bash install.sh`
 
-Run this command in the terminal to restart ComfyUI `bash /restart-comfyui.sh`
+Run this command in the terminal to restart ComfyUI `bash restart-comfyui.sh`
 
 EOF
 }
