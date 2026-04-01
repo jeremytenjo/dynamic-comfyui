@@ -18,7 +18,7 @@ This template system gives you a repeatable way to launch ComfyUI on RunPod whil
 1. Define a project template in `dependencies/*.yaml`.
 2. Start the environment and select a template.
 3. The installer reads the template and installs the specified ComfyUI version, custom node repositories, and model files.
-4. Your selected template is saved in `/workspace/.avatary_selected_project` for reuse.
+4. Your selected template is saved in `/workspace/.dynamic-comfyui_selected_project` for reuse.
 
 ## Template Format
 
@@ -41,13 +41,13 @@ Create one YAML file per project profile you want to maintain.
 ## Main Commands
 
 - `bash start.sh`
-Select a project template and install/start ComfyUI.
+  Select a project template and install/start ComfyUI.
 
 - `bash start-new-project.sh`
-Switch to a different template and optionally clean dependencies from the previously selected project.
+  Switch to a different template and optionally clean dependencies from the previously selected project.
 
 - `bash update-nodes-and-models.sh`
-Re-sync the currently selected project's nodes and models, then restart ComfyUI.
+  Re-sync the currently selected project's nodes and models, then restart ComfyUI.
 
 ## Repo Structure
 

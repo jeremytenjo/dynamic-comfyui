@@ -2,7 +2,7 @@
 
 
 install_sentinel_path() {
-    echo "$NETWORK_VOLUME/.avatary_install_complete"
+    echo "$NETWORK_VOLUME/.dynamic-comfyui_install_complete"
 }
 
 

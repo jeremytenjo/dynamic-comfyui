@@ -2,7 +2,7 @@
 
 
 project_selection_state_path() {
-    echo "$NETWORK_VOLUME/.avatary_selected_project"
+    echo "$NETWORK_VOLUME/.dynamic-comfyui_selected_project"
 }
 
 

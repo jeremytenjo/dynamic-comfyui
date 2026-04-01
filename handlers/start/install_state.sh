@@ -2,6 +2,6 @@
 
 
 verify_install_sentinel() {
-    local sentinel="$NETWORK_VOLUME/.avatary_install_complete"
+    local sentinel="$NETWORK_VOLUME/.dynamic-comfyui_install_complete"
     [ -f "$sentinel" ]
 }
