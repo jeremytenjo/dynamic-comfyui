@@ -25,7 +25,7 @@ on:
         description: 'Docker image name'
         required: true
         type: string
-        default: avatary-image-generator-v1
+        default: dynamic-comfyui
       upgrade_comfyui:
         description: 'Force refresh ComfyUI layer (use to upgrade from latest version)'
         required: true

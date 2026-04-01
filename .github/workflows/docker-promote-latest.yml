@@ -7,7 +7,7 @@ on:
         description: 'Docker image name'
         required: true
         type: string
-        default: avatary-image-generator-v1
+        default: dynamic-comfyui
       source_tag:
         description: 'Existing tag to promote (example: v1.0.7)'
         required: true
