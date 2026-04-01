@@ -6,6 +6,23 @@ active_project_manifest_path() {
 }
 
 
+normalize_project_manifest_url() {
+    local candidate_url="$1"
+
+    if [[ "$candidate_url" =~ ^https?://github\.com/([^/]+)/([^/]+)/blob/([^/]+)/(.+)$ ]]; then
+        local owner="${BASH_REMATCH[1]}"
+        local repo="${BASH_REMATCH[2]}"
+        local ref="${BASH_REMATCH[3]}"
+        local path="${BASH_REMATCH[4]}"
+        printf 'https://raw.githubusercontent.com/%s/%s/%s/%s\n' "$owner" "$repo" "$ref" "$path"
+        return 0
+    fi
+
+    printf '%s\n' "$candidate_url"
+    return 0
+}
+
+
 validate_project_manifest_url() {
     local candidate_url="$1"
     if [[ "$candidate_url" =~ ^https?://.+\.(yaml|yml)(\?.*)?$ ]]; then
@@ -39,6 +56,7 @@ download_project_manifest_from_url() {
 
 prompt_and_prepare_project_manifest_from_url() {
     local source_url=""
+    local normalized_url=""
     local manifest_path
     manifest_path="$(active_project_manifest_path)"
 
@@ -49,11 +67,13 @@ prompt_and_prepare_project_manifest_from_url() {
             continue
         fi
 
-        if ! validate_project_manifest_url "$source_url"; then
+        normalized_url="$(normalize_project_manifest_url "$source_url")"
+
+        if ! validate_project_manifest_url "$normalized_url"; then
             continue
         fi
 
-        if ! download_project_manifest_from_url "$source_url" "$manifest_path"; then
+        if ! download_project_manifest_from_url "$normalized_url" "$manifest_path"; then
             continue
         fi
 
@@ -62,11 +82,11 @@ prompt_and_prepare_project_manifest_from_url() {
 
     SELECTED_PROJECT_KEY="active-project"
     SELECTED_PROJECT_MANIFEST_PATH="$manifest_path"
-    SELECTED_PROJECT_SOURCE_URL="$source_url"
+    SELECTED_PROJECT_SOURCE_URL="$normalized_url"
     INSTALL_MANIFEST_PATH="$manifest_path"
     export SELECTED_PROJECT_KEY SELECTED_PROJECT_MANIFEST_PATH SELECTED_PROJECT_SOURCE_URL INSTALL_MANIFEST_PATH
 
-    echo "Using manifest URL: $source_url"
+    echo "Using manifest URL: $SELECTED_PROJECT_SOURCE_URL"
     return 0
 }
 
@@ -95,6 +115,7 @@ refresh_project_manifest_from_saved_url() {
         return 1
     fi
 
+    saved_source_url="$(normalize_project_manifest_url "$saved_source_url")"
     if ! validate_project_manifest_url "$saved_source_url"; then
         echo "❌ Saved project URL is invalid. Run 'bash start.sh' and enter a valid YAML URL."
         return 1
