@@ -2,7 +2,7 @@
 
 
 apply_flash_attn_runtime_hotfix() {
-    # Runtime hotfix for transformers optional dependency probing.
+    # Runtime hotfix for transformers optional package probing.
     # Some custom nodes hit KeyError('flash_attn') during import.
     local hotfix_dir="/tmp/comfy_python_hotfixes"
     mkdir -p "$hotfix_dir"

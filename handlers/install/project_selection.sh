@@ -7,10 +7,10 @@ project_selection_state_path() {
 
 
 list_project_manifest_paths() {
-    local dependencies_dir="$SCRIPT_DIR/dependencies"
+    local projects_dir="$SCRIPT_DIR/projects"
 
-    if [ ! -d "$dependencies_dir" ]; then
-        echo "❌ Dependencies directory not found: $dependencies_dir"
+    if [ ! -d "$projects_dir" ]; then
+        echo "❌ Projects directory not found: $projects_dir"
         return 1
     fi
 
@@ -19,10 +19,10 @@ list_project_manifest_paths() {
     while IFS= read -r manifest_path; do
         [ -n "$manifest_path" ] || continue
         manifests+=("$manifest_path")
-    done < <(find "$dependencies_dir" -maxdepth 1 -type f -name '*.yaml' | LC_ALL=C sort)
+    done < <(find "$projects_dir" -maxdepth 1 -type f -name '*.yaml' | LC_ALL=C sort)
 
     if [ "${#manifests[@]}" -eq 0 ]; then
-        echo "❌ No dependency manifests found in $dependencies_dir"
+        echo "❌ No project manifests found in $projects_dir"
         return 1
     fi
 
@@ -71,7 +71,7 @@ load_saved_project_manifest() {
     fi
 
     if [ ! -f "$saved_path" ]; then
-        echo "❌ Saved dependency manifest is missing: $saved_path"
+        echo "❌ Saved project manifest is missing: $saved_path"
         return 1
     fi
 

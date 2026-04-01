@@ -21,19 +21,19 @@ if ! prompt_for_project_manifest_selection; then
     exit 1
 fi
 
-cleanup_previous_project_dependencies="no"
+cleanup_previous_project_resources="no"
 if [ -n "$previous_manifest_path" ] && [ "$previous_manifest_path" != "$SELECTED_PROJECT_MANIFEST_PATH" ]; then
     echo "Previous project: $previous_project_key"
     echo "Selected project: $SELECTED_PROJECT_KEY"
     while true; do
-        read -r -p "Remove dependencies from previous project? (y/n): " remove_choice
+        read -r -p "Remove resources from previous project? (y/n): " remove_choice
         case "$remove_choice" in
             y|Y|yes|YES)
-                cleanup_previous_project_dependencies="yes"
+                cleanup_previous_project_resources="yes"
                 break
                 ;;
             n|N|no|NO)
-                cleanup_previous_project_dependencies="no"
+                cleanup_previous_project_resources="no"
                 break
                 ;;
             *)
@@ -50,19 +50,19 @@ if ! run_comfyui_install_flow; then
     exit 1
 fi
 
-if [ "$cleanup_previous_project_dependencies" = "yes" ]; then
+if [ "$cleanup_previous_project_resources" = "yes" ]; then
     set_network_volume_default
     if ! ensure_comfyui_workspace; then
         exit 1
     fi
 
-    echo "Removing dependencies from previous project: $previous_project_key"
-    if ! remove_dependencies_from_manifest "$previous_manifest_path"; then
-        echo "❌ Failed to remove dependencies from previous project."
+    echo "Removing resources from previous project: $previous_project_key"
+    if ! remove_project_resources_from_manifest "$previous_manifest_path"; then
+        echo "❌ Failed to remove resources from previous project."
         exit 1
     fi
 
-    echo "Refreshing selected project dependencies after cleanup..."
+    echo "Refreshing selected project resources after cleanup..."
     if ! prepare_manifest_install_context; then
         exit 1
     fi

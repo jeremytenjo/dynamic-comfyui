@@ -4,7 +4,7 @@ Define your models and nodes in templates for easy ComfyUI environment managemen
 
 ## Template Format
 
-Example (`dependencies/example.yaml`):
+Example (`projects/example.yaml`):
 
 ```yaml
 comfyui_version: '0.18.2'
@@ -26,7 +26,7 @@ Create one YAML file per project profile you want to maintain.
   Select a project template and install/start ComfyUI.
 
 - `bash start-new-project.sh`
-  Switch to a different template and optionally clean dependencies from the previously selected project.
+  Switch to a different template and optionally clean resources from the previously selected project.
 
 - `bash update-nodes-and-models.sh`
   Re-sync the currently selected project's nodes and models, then restart ComfyUI.

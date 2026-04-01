@@ -2,7 +2,7 @@
 
 
 load_install_manifest() {
-    if ! fetch_dependencies; then
+    if ! fetch_project_manifest; then
         return 1
     fi
 

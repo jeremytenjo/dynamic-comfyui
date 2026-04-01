@@ -5,7 +5,7 @@ install_manifest_tmp_dir() {
     printf '%s\n' "/tmp/dynamic-comfyui-install-manifest"
 }
 
-fetch_dependencies() {
+fetch_project_manifest() {
     local manifest_tmp_dir
 
     if [ -z "${INSTALL_MANIFEST_PATH:-}" ]; then

@@ -1,11 +1,11 @@
 # shellcheck shell=bash
 
 
-remove_dependencies_from_manifest() {
+remove_project_resources_from_manifest() {
     local manifest_path="$1"
 
     if [ -z "$manifest_path" ] || [ ! -f "$manifest_path" ]; then
-        echo "❌ Cannot remove dependencies. Manifest not found: $manifest_path"
+        echo "❌ Cannot remove project resources. Manifest not found: $manifest_path"
         return 1
     fi
 

@@ -57,7 +57,7 @@ COPY start-new-project.sh /start-new-project.sh
 COPY install.sh /install.sh
 COPY update-nodes-and-models.sh /update-nodes-and-models.sh
 COPY restart-comfyui.sh /restart-comfyui.sh
-COPY dependencies /dependencies
+COPY projects /projects
 COPY handlers /handlers
 
 RUN chmod +x /start.sh /start-new-project.sh /install.sh /update-nodes-and-models.sh /restart-comfyui.sh

@@ -7,7 +7,7 @@ run_custom_node_post_install() {
     local install_script="$node_path/install.py"
 
     if [ -f "$requirements_file" ]; then
-        echo "📦 Installing Python dependencies for $repo_dir"
+        echo "📦 Installing Python requirements for $repo_dir"
         if ! python3 -m pip install --no-cache-dir -r "$requirements_file"; then
             echo "⚠️ Failed to install requirements for $repo_dir"
             return 1
@@ -83,7 +83,7 @@ install_custom_nodes() {
     done < "$INSTALL_MANIFEST_CUSTOM_NODES_FILE"
 
     if [ "${#custom_node_specs[@]}" -eq 0 ]; then
-        echo "No custom nodes defined in dependencies manifest; skipping node installation."
+        echo "No custom nodes defined in project manifest; skipping node installation."
         return 0
     fi
 
