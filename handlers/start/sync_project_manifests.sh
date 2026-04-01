@@ -10,14 +10,14 @@ derive_projects_repo_api_url() {
     settings_path="$(projects_settings_path)"
 
     if [ ! -f "$settings_path" ]; then
-        echo "❌ Missing required settings file: $settings_path"
-        echo "❌ Required key: github.owner_url"
+        echo "❌ Missing required settings file: $settings_path" >&2
+        echo "❌ Required key: github.owner_url" >&2
         return 1
     fi
 
     if [ ! -r "$settings_path" ]; then
-        echo "❌ Cannot read required settings file: $settings_path"
-        echo "❌ Required key: github.owner_url"
+        echo "❌ Cannot read required settings file: $settings_path" >&2
+        echo "❌ Required key: github.owner_url" >&2
         return 1
     fi
 
@@ -100,7 +100,7 @@ refresh_project_manifests() {
 
     local listing_json
     if ! listing_json="$(curl --silent --show-error --fail "$repo_api_url")"; then
-        echo "⚠️ Failed to fetch project manifest list from GitHub."
+        echo "⚠️ Failed to fetch project manifest list from GitHub." >&2
         rm -rf "$sync_tmp_dir"
         return 1
     fi
@@ -149,7 +149,7 @@ if not rows:
 rows.sort(key=lambda row: row[0])
 out_path.write_text("".join(f"{name}\t{url}\n" for name, url in rows), encoding="utf-8")
 PY
-        echo "⚠️ Failed to parse project manifest list from GitHub."
+        echo "⚠️ Failed to parse project manifest list from GitHub." >&2
         rm -rf "$sync_tmp_dir"
         return 1
     fi
@@ -160,7 +160,7 @@ PY
     while IFS=$'\t' read -r filename download_url; do
         [ -n "$filename" ] || continue
         if ! curl --silent --show-error --fail --location "$download_url" --output "$sync_tmp_dir/$filename"; then
-            echo "⚠️ Failed to download project manifest: $filename"
+            echo "⚠️ Failed to download project manifest: $filename" >&2
             rm -rf "$sync_tmp_dir"
             return 1
         fi
@@ -168,7 +168,7 @@ PY
     done < "$downloads_file"
 
     if [ "$synced_count" -eq 0 ]; then
-        echo "⚠️ No project manifests downloaded from GitHub."
+        echo "⚠️ No project manifests downloaded from GitHub." >&2
         rm -rf "$sync_tmp_dir"
         return 1
     fi
