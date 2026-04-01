@@ -67,7 +67,7 @@ serve_setup_instructions_page() {
     <ol>
       <li>Open Jupyter Lab (port 8888).</li>
       <li>Open a terminal in Jupyter.</li>
-      <li>Run <code>bash start.sh</code>.</li>
+      <li>Run <code>bash start.sh</code></li>
     </ol>
     <p>The installer downloads models and custom nodes, then starts ComfyUI on port 8188.</p>
     <p class="hint">You can keep this tab open and refresh after installation completes.</p>
