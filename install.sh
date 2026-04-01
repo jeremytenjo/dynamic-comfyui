@@ -13,6 +13,9 @@ NETWORK_VOLUME="/workspace"
 prepare_network_volume_and_start_jupyter
 
 set_network_volume_default
+if ! sync_workspace_settings_file; then
+    echo "⚠️ settings sync failed. 'bash start.sh' will fail until $NETWORK_VOLUME/settings.yaml exists." >&2
+fi
 write_runtime_instructions
 
 if ! ensure_comfyui_workspace; then
