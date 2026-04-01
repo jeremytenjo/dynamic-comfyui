@@ -19,6 +19,8 @@ Usage:
 
 Run this command in the terminal to start ComfyUI `bash start.sh`
 
+Run this command in the terminal to switch projects `bash start-new-project.sh`
+
 Run this command in the terminal to restart ComfyUI `bash restart-comfyui.sh`
 
 Run this command in the terminal to update nodes and models `bash update-nodes-and-models.sh`

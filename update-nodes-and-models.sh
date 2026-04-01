@@ -11,17 +11,21 @@ source_install_handlers "$SCRIPT_DIR"
 NETWORK_VOLUME="/workspace"
 export NETWORK_VOLUME
 
+if ! set_install_manifest_from_saved_project; then
+    exit 1
+fi
+
 if ! prepare_manifest_install_context; then
     exit 1
 fi
 
-echo "Ensuring required custom nodes are installed via latest manifest..."
+echo "Ensuring required custom nodes are installed..."
 if ! install_custom_nodes; then
     echo "❌ Custom node refresh failed."
     exit 1
 fi
 
-echo "Ensuring required models are installed via latest manifest..."
+echo "Ensuring required models are installed..."
 if ! install_models_with_comfy_cli; then
     echo "❌ Model refresh failed."
     exit 1
