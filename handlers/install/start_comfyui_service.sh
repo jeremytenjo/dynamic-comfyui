@@ -2,6 +2,8 @@
 
 
 start_comfyui_service() {
+    local start_ts
+    start_ts=$(date +%s)
     local url="http://127.0.0.1:8188"
     local comfy_health_url="$url/system_stats"
     local -a comfy_args=(--listen --enable-manager --disable-cuda-malloc)
@@ -66,6 +68,13 @@ start_comfyui_service() {
         counter=$((counter + 2))
     done
 
-    echo "🚀 ComfyUI is UP"
+    local end_ts
+    local elapsed_seconds
+    local elapsed_minutes
+    end_ts=$(date +%s)
+    elapsed_seconds=$((end_ts - start_ts))
+    elapsed_minutes=$(( (elapsed_seconds + 59) / 60 ))
+
+    echo "🚀 ComfyUI is UP (${elapsed_minutes} minute(s))"
     return 0
 }
