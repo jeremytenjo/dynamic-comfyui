@@ -12,7 +12,7 @@ source_install_handlers "$SCRIPT_DIR"
 NETWORK_VOLUME="/workspace"
 export NETWORK_VOLUME
 
-if ! refresh_project_manifests; then
+if ! refresh_project_manifest_from_saved_url; then
     exit 1
 fi
 

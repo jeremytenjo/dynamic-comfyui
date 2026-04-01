@@ -10,15 +10,11 @@ source_install_handlers "$SCRIPT_DIR"
 NETWORK_VOLUME="/workspace"
 export NETWORK_VOLUME
 
-if ! refresh_project_manifests; then
+if ! prompt_and_prepare_project_manifest_from_url; then
     exit 1
 fi
 
-if ! prompt_for_project_manifest_selection; then
-    exit 1
-fi
-
-save_selected_project_manifest "$SELECTED_PROJECT_KEY" "$SELECTED_PROJECT_MANIFEST_PATH"
+save_selected_project_manifest "$SELECTED_PROJECT_KEY" "$SELECTED_PROJECT_MANIFEST_PATH" "$SELECTED_PROJECT_SOURCE_URL"
 echo "Selected project: $SELECTED_PROJECT_KEY"
 
 if ! run_comfyui_install_flow; then

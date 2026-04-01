@@ -14,19 +14,16 @@ L40S GPU
 First Time Setup:
 
 Save your character lora in the /ComfyUI/models/lora folder.
-Create /settings.yaml with github.owner_url pointing to your GitHub repo:
-github:
-  owner_url: "https://github.com/<owner>/<repo>"
 
 Usage: 
 
-Run this command in the terminal to start ComfyUI `bash start.sh`
+Run this command in the terminal to start ComfyUI. First step: enter your direct YAML URL `bash start.sh`
 
-Run this command in the terminal to switch projects `bash start-new-project.sh`
+Run this command in the terminal to switch projects. First step: enter your direct YAML URL `bash start-new-project.sh`
 
 Run this command in the terminal to restart ComfyUI `bash restart-comfyui.sh`
 
-Run this command in the terminal to update nodes and models `bash update-nodes-and-models.sh`
+Run this command in the terminal to update nodes and models (uses the last saved YAML URL) `bash update-nodes-and-models.sh`
 
 Run this command in the terminal to list available commands `bash help.sh`
 

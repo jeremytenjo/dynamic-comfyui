@@ -4,13 +4,13 @@ cat <<'TXT'
 Dynamic ComfyUI Commands
 
 - bash start.sh
-  Select a project and install/start ComfyUI.
+  Enter a direct YAML URL and install/start ComfyUI.
 
 - bash start-new-project.sh
-  Switch to a different project and optionally clean previous project resources.
+  Enter a new YAML URL and optionally clean previous project resources.
 
 - bash update-nodes-and-models.sh
-  Refresh nodes/models from the latest project manifest and restart ComfyUI.
+  Re-download the last saved YAML URL, refresh nodes/models, and restart ComfyUI.
 
 - bash restart-comfyui.sh
   Restart ComfyUI service.

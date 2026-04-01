@@ -20,24 +20,23 @@ models:
 
 Create one YAML file per project profile you want to maintain.
 
-## Settings Configuration
+## YAML URL Flow
 
-Project manifest sync requires `/settings.yaml` with `github.owner_url`:
+Runtime project loading uses a direct YAML URL:
 
-```yaml
-github:
-  owner_url: 'https://github.com/<owner>/<repo>'
-```
+- `bash start.sh` prompts for a YAML URL (`http(s)` and `.yaml`/`.yml`), downloads it, and installs from it.
+- `bash start-new-project.sh` does the same prompt-first flow and keeps the optional previous-project cleanup prompt.
+- `bash update-nodes-and-models.sh` re-downloads the last saved YAML URL and refreshes nodes/models.
 
-At runtime, `bash start.sh` and `bash start-new-project.sh` derive the source API from this URL and sync manifests from `projects` on branch `main`.
+The active downloaded manifest is stored at `/workspace/projects/active-project.yaml`.
 
 ## Main Commands
 
 - `bash start.sh`
-  Select a project template and install/start ComfyUI.
+  Enter a YAML URL, then install/start ComfyUI.
 
 - `bash start-new-project.sh`
-  Switch to a different template and optionally clean resources from the previously selected project.
+  Enter a new YAML URL and optionally clean resources from the previously selected project.
 
 - `bash update-nodes-and-models.sh`
-  Re-sync the currently selected project's nodes and models, then restart ComfyUI.
+  Re-download the last saved YAML URL, refresh nodes/models, then restart ComfyUI.

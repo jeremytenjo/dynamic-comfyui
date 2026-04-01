@@ -52,16 +52,18 @@ manifest_project_key() {
 save_selected_project_manifest() {
     local project_key="$1"
     local manifest_path="$2"
+    local project_source_url="${3:-}"
     local state_path
     state_path="$(project_selection_state_path)"
 
     mkdir -p "$NETWORK_VOLUME"
-    printf '%s\t%s\n' "$project_key" "$manifest_path" > "$state_path"
+    printf '%s\t%s\t%s\n' "$project_key" "$manifest_path" "$project_source_url" > "$state_path"
 
     SELECTED_PROJECT_KEY="$project_key"
     SELECTED_PROJECT_MANIFEST_PATH="$manifest_path"
+    SELECTED_PROJECT_SOURCE_URL="$project_source_url"
     INSTALL_MANIFEST_PATH="$manifest_path"
-    export SELECTED_PROJECT_KEY SELECTED_PROJECT_MANIFEST_PATH INSTALL_MANIFEST_PATH
+    export SELECTED_PROJECT_KEY SELECTED_PROJECT_MANIFEST_PATH SELECTED_PROJECT_SOURCE_URL INSTALL_MANIFEST_PATH
 }
 
 
@@ -75,7 +77,8 @@ load_saved_project_manifest() {
 
     local saved_key=""
     local saved_path=""
-    IFS=$'\t' read -r saved_key saved_path < "$state_path" || true
+    local saved_source_url=""
+    IFS=$'\t' read -r saved_key saved_path saved_source_url < "$state_path" || true
 
     if [ -z "$saved_key" ] || [ -z "$saved_path" ]; then
         echo "❌ Saved project selection is invalid: $state_path"
@@ -89,7 +92,8 @@ load_saved_project_manifest() {
 
     SAVED_PROJECT_KEY="$saved_key"
     SAVED_PROJECT_MANIFEST_PATH="$saved_path"
-    export SAVED_PROJECT_KEY SAVED_PROJECT_MANIFEST_PATH
+    SAVED_PROJECT_SOURCE_URL="$saved_source_url"
+    export SAVED_PROJECT_KEY SAVED_PROJECT_MANIFEST_PATH SAVED_PROJECT_SOURCE_URL
     return 0
 }
 
@@ -104,7 +108,8 @@ try_load_saved_project_manifest() {
 
     local saved_key=""
     local saved_path=""
-    IFS=$'\t' read -r saved_key saved_path < "$state_path" || true
+    local saved_source_url=""
+    IFS=$'\t' read -r saved_key saved_path saved_source_url < "$state_path" || true
 
     if [ -z "$saved_key" ] || [ -z "$saved_path" ]; then
         return 1
@@ -116,7 +121,8 @@ try_load_saved_project_manifest() {
 
     SAVED_PROJECT_KEY="$saved_key"
     SAVED_PROJECT_MANIFEST_PATH="$saved_path"
-    export SAVED_PROJECT_KEY SAVED_PROJECT_MANIFEST_PATH
+    SAVED_PROJECT_SOURCE_URL="$saved_source_url"
+    export SAVED_PROJECT_KEY SAVED_PROJECT_MANIFEST_PATH SAVED_PROJECT_SOURCE_URL
     return 0
 }
 
@@ -158,16 +164,35 @@ prompt_for_project_manifest_selection() {
 }
 
 
+load_saved_project_manifest_require_url() {
+    if ! load_saved_project_manifest; then
+        return 1
+    fi
+
+    if [ -z "${SAVED_PROJECT_SOURCE_URL:-}" ]; then
+        echo "❌ Saved project selection is missing source URL (legacy state). Run 'bash start.sh' once."
+        return 1
+    fi
+
+    return 0
+}
+
+
 set_install_manifest_from_saved_project() {
     if ! load_saved_project_manifest; then
         echo "❌ No saved project selection found. Run 'bash start.sh' or 'bash start-new-project.sh' first."
+        return 1
+    fi
+    if [ -z "${SAVED_PROJECT_SOURCE_URL:-}" ]; then
+        echo "❌ Saved project selection is missing source URL (legacy state). Run 'bash start.sh' once."
         return 1
     fi
 
     INSTALL_MANIFEST_PATH="$SAVED_PROJECT_MANIFEST_PATH"
     SELECTED_PROJECT_KEY="$SAVED_PROJECT_KEY"
     SELECTED_PROJECT_MANIFEST_PATH="$SAVED_PROJECT_MANIFEST_PATH"
-    export INSTALL_MANIFEST_PATH SELECTED_PROJECT_KEY SELECTED_PROJECT_MANIFEST_PATH
+    SELECTED_PROJECT_SOURCE_URL="$SAVED_PROJECT_SOURCE_URL"
+    export INSTALL_MANIFEST_PATH SELECTED_PROJECT_KEY SELECTED_PROJECT_MANIFEST_PATH SELECTED_PROJECT_SOURCE_URL
 
     echo "Using saved project: $SELECTED_PROJECT_KEY"
     return 0
