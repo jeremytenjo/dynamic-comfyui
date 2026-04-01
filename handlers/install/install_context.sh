@@ -2,7 +2,6 @@
 
 
 prepare_manifest_install_context() {
-    set_install_manifest_path_default
     set_network_volume_default
 
     if ! load_install_manifest; then

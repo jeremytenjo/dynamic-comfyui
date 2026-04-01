@@ -5,25 +5,11 @@ install_manifest_tmp_dir() {
     printf '%s\n' "/tmp/avatary-install-manifest"
 }
 
-set_install_manifest_path_default() {
-    if [ -z "${INSTALL_MANIFEST_PATH:-}" ]; then
-        local default_manifest
-        default_manifest="$(default_project_manifest_path)"
-        if [ -f "$default_manifest" ]; then
-            INSTALL_MANIFEST_PATH="$default_manifest"
-            export INSTALL_MANIFEST_PATH
-        fi
-    fi
-}
-
-
 fetch_dependencies() {
     local manifest_tmp_dir
 
-    set_install_manifest_path_default
-
     if [ -z "${INSTALL_MANIFEST_PATH:-}" ]; then
-        echo "❌ INSTALL_MANIFEST_PATH is not set."
+        echo "❌ INSTALL_MANIFEST_PATH is not set. Select a project with 'bash start.sh' or load a saved one first."
         return 1
     fi
 

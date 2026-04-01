@@ -6,11 +6,6 @@ project_selection_state_path() {
 }
 
 
-default_project_manifest_path() {
-    echo "$SCRIPT_DIR/dependencies/avatary-image-generator-v1.yaml"
-}
-
-
 list_project_manifest_paths() {
     local dependencies_dir="$SCRIPT_DIR/dependencies"
 
