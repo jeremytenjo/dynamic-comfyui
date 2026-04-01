@@ -11,7 +11,7 @@ NETWORK_VOLUME="/workspace"
 export NETWORK_VOLUME
 
 if ! refresh_project_manifests; then
-    echo "⚠️ Continuing with local project manifests."
+    exit 1
 fi
 
 if ! prompt_for_project_manifest_selection; then

@@ -20,6 +20,17 @@ models:
 
 Create one YAML file per project profile you want to maintain.
 
+## Settings Configuration
+
+Project manifest sync requires `/workspace/settings.yaml` with `github.owner_url`:
+
+```yaml
+github:
+  owner_url: 'https://github.com/<owner>/<repo>'
+```
+
+At runtime, `bash start.sh` and `bash start-new-project.sh` derive the source API from this URL and sync manifests from `projects` on branch `main`.
+
 ## Main Commands
 
 - `bash start.sh`

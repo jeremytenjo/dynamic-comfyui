@@ -14,6 +14,9 @@ L40S GPU
 First Time Setup:
 
 Save your character lora in the /ComfyUI/models/lora folder.
+Create /workspace/settings.yaml with github.owner_url pointing to your GitHub repo:
+github:
+  owner_url: "https://github.com/<owner>/<repo>"
 
 Usage: 
 
