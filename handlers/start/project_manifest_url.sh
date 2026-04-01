@@ -61,7 +61,7 @@ prompt_and_prepare_project_manifest_from_url() {
     manifest_path="$(active_project_manifest_path)"
 
     while true; do
-        read -r -p "Enter project YAML URL: " source_url
+        read -r -p "Enter project URL: " source_url
         if [ -z "$source_url" ]; then
             echo "❌ YAML URL is required."
             continue
