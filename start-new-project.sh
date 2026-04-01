@@ -12,7 +12,7 @@ export NETWORK_VOLUME
 
 previous_project_key=""
 previous_manifest_path=""
-if load_saved_project_manifest; then
+if try_load_saved_project_manifest; then
     previous_project_key="$SAVED_PROJECT_KEY"
     previous_manifest_path="$SAVED_PROJECT_MANIFEST_PATH"
 fi
@@ -43,6 +43,13 @@ if [ -n "$previous_manifest_path" ] && [ "$previous_manifest_path" != "$SELECTED
     done
 fi
 
+save_selected_project_manifest "$SELECTED_PROJECT_KEY" "$SELECTED_PROJECT_MANIFEST_PATH"
+echo "Selected project: $SELECTED_PROJECT_KEY"
+
+if ! run_comfyui_install_flow; then
+    exit 1
+fi
+
 if [ "$cleanup_previous_project_dependencies" = "yes" ]; then
     set_network_volume_default
     if ! ensure_comfyui_workspace; then
@@ -54,11 +61,20 @@ if [ "$cleanup_previous_project_dependencies" = "yes" ]; then
         echo "❌ Failed to remove dependencies from previous project."
         exit 1
     fi
-fi
 
-save_selected_project_manifest "$SELECTED_PROJECT_KEY" "$SELECTED_PROJECT_MANIFEST_PATH"
-echo "Selected project: $SELECTED_PROJECT_KEY"
-
-if ! run_comfyui_install_flow; then
-    exit 1
+    echo "Refreshing selected project dependencies after cleanup..."
+    if ! prepare_manifest_install_context; then
+        exit 1
+    fi
+    if ! install_custom_nodes; then
+        echo "❌ Failed to reinstall selected project custom nodes after cleanup."
+        exit 1
+    fi
+    if ! install_models_with_comfy_cli; then
+        echo "❌ Failed to reinstall selected project models after cleanup."
+        exit 1
+    fi
+    if ! start_comfyui_service; then
+        exit 1
+    fi
 fi

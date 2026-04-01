@@ -87,6 +87,33 @@ load_saved_project_manifest() {
 }
 
 
+try_load_saved_project_manifest() {
+    local state_path
+    state_path="$(project_selection_state_path)"
+
+    if [ ! -f "$state_path" ]; then
+        return 1
+    fi
+
+    local saved_key=""
+    local saved_path=""
+    IFS=$'\t' read -r saved_key saved_path < "$state_path" || true
+
+    if [ -z "$saved_key" ] || [ -z "$saved_path" ]; then
+        return 1
+    fi
+
+    if [ ! -f "$saved_path" ]; then
+        return 1
+    fi
+
+    SAVED_PROJECT_KEY="$saved_key"
+    SAVED_PROJECT_MANIFEST_PATH="$saved_path"
+    export SAVED_PROJECT_KEY SAVED_PROJECT_MANIFEST_PATH
+    return 0
+}
+
+
 prompt_for_project_manifest_selection() {
     if ! list_project_manifest_paths; then
         return 1
