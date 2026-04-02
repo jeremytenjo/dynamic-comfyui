@@ -1,10 +1,10 @@
 # Dynamic ComfyUI Templates for RunPod
 
-Define your models and nodes in templates for easy ComfyUI environment management on RunPod.
+Define your models and nodes in templates for easy ComfyUI environment setup on RunPod.
 
 ## Template Format
 
-Example (`projects/example.yaml`):
+Example (`<URL>.yaml`):
 
 ```yaml
 custom_nodes:
@@ -16,27 +16,19 @@ models:
     target: 'models/vae/ae.safetensors'
 ```
 
-Create one YAML file per project profile you want to maintain.
-
-Runtime project YAML controls custom nodes and models only. ComfyUI core version updates are build-time only via the GitHub Action inputs `upgrade_comfyui` and optional `comfyui_version`.
-
-## YAML URL Flow
-
-Runtime project loading uses a direct YAML URL:
-
-- `bash start.sh` prompts for a YAML URL (`http(s)` and `.yaml`/`.yml`), downloads it, and installs from it.
-- `bash start-new-project.sh` does the same prompt-first flow and keeps the optional previous-project cleanup prompt.
-- `bash update-nodes-and-models.sh` re-downloads the last saved YAML URL and refreshes nodes/models.
-
-The active downloaded manifest is stored at `/workspace/projects/active-project.yaml`.
-
-## Main Commands
+## Commands
 
 - `bash start.sh`
   Enter a YAML URL, then install/start ComfyUI.
 
 - `bash start-new-project.sh`
   Enter a new YAML URL and optionally clean resources from the previously selected project.
+
+- `bash add-project.sh`
+  Enter a new YAML URL and add missing nodes/models without removing existing resources.
+
+- `bash replace-project.sh`
+  Enter a new YAML URL, remove previous project resources, then reinstall/start the selected project resources.
 
 - `bash update-nodes-and-models.sh`
   Re-download the last saved YAML URL, refresh nodes/models, then restart ComfyUI.
