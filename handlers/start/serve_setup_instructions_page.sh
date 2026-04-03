@@ -175,7 +175,7 @@ serve_setup_instructions_page() {
       <li>Run <code>bash start.sh</code></li>
     </ol>
     <p>The installer downloads files and custom nodes, then starts ComfyUI on port 8188.</p>
-    <p class="hint">You can keep this tab open and refresh after installation completes.</p>
+    <p class="hint">You can keep this tab open. It will switch to ComfyUI automatically when ready.</p>
     <section class="progress">
       <h2>Download checklist</h2>
       <p id="progress-status" class="status">Status: Pending</p>
@@ -313,9 +313,26 @@ serve_setup_instructions_page() {
       }
     }
 
+    async function redirectToComfyWhenReady() {
+      try {
+        const res = await fetch(`/system_stats?t=${Date.now()}`, { cache: "no-store" });
+        if (!res.ok) return;
+        const contentType = res.headers.get("content-type") || "";
+        if (!contentType.includes("application/json")) return;
+        const payload = await res.json();
+        if (!payload || typeof payload !== "object") return;
+        if (!("system" in payload)) return;
+        window.location.replace("/");
+      } catch (_err) {
+        // ComfyUI not ready yet
+      }
+    }
+
     setJupyterLink();
     pollProgress();
+    redirectToComfyWhenReady();
     setInterval(pollProgress, 2000);
+    setInterval(redirectToComfyWhenReady, 2000);
   </script>
 </body>
 </html>

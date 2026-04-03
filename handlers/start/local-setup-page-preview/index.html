@@ -378,9 +378,26 @@
       document.getElementById("btn-failed")?.addEventListener("click", () => renderProgress(mockStates.failed));
     }
 
+    async function redirectToComfyWhenReady() {
+      try {
+        const res = await fetch(`/system_stats?t=${Date.now()}`, { cache: "no-store" });
+        if (!res.ok) return;
+        const contentType = res.headers.get("content-type") || "";
+        if (!contentType.includes("application/json")) return;
+        const payload = await res.json();
+        if (!payload || typeof payload !== "object") return;
+        if (!("system" in payload)) return;
+        window.location.replace("/");
+      } catch (_err) {
+        // ComfyUI not ready yet
+      }
+    }
+
     setJupyterLink();
     wireButtons();
     renderProgress(mockStates.running);
+    redirectToComfyWhenReady();
+    setInterval(redirectToComfyWhenReady, 2000);
   </script>
 </body>
 </html>
