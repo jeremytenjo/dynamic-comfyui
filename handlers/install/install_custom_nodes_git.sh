@@ -91,6 +91,10 @@ install_custom_nodes() {
 
     local total_custom_nodes=${#custom_node_specs[@]}
     local node_idx=0
+    local refresh_progress=0
+    if declare -F setup_progress_refresh >/dev/null 2>&1; then
+        refresh_progress=1
+    fi
     local spec
     for spec in "${custom_node_specs[@]}"; do
         local repo_dir
@@ -100,8 +104,15 @@ install_custom_nodes() {
         echo "⬇️ [$node_idx/$total_custom_nodes] Installing git node $repo_dir"
 
         if ! install_custom_node_from_git "$repo_dir" "$repo_url"; then
+            if [ "$refresh_progress" -eq 1 ]; then
+                setup_progress_refresh || true
+            fi
             echo "❌ Custom node installation failed: $repo_dir"
             return 1
+        fi
+
+        if [ "$refresh_progress" -eq 1 ]; then
+            setup_progress_refresh || true
         fi
     done
 

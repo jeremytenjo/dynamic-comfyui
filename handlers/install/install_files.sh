@@ -44,6 +44,10 @@ install_files() {
     local total_files=${#file_specs[@]}
     local file_idx=0
     local failed_downloads=0
+    local refresh_progress=0
+    if declare -F setup_progress_refresh >/dev/null 2>&1; then
+        refresh_progress=1
+    fi
     local file_spec
     for file_spec in "${file_specs[@]}"; do
         local file_url
@@ -56,6 +60,10 @@ install_files() {
 
         if ! download_file_with_curl "$file_url" "$file_path" "$file_target"; then
             failed_downloads=$((failed_downloads + 1))
+        fi
+
+        if [ "$refresh_progress" -eq 1 ]; then
+            setup_progress_refresh || true
         fi
     done
 
