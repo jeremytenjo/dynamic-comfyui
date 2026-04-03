@@ -10,7 +10,10 @@ source_install_handlers "$SCRIPT_DIR"
 # Set the network volume path
 NETWORK_VOLUME="/workspace"
 
-prepare_network_volume_and_start_jupyter
+if ! prepare_network_volume_and_start_jupyter; then
+    echo "❌ Failed to start JupyterLab. See /tmp/dynamic-comfyui-jupyter.log for details."
+    exit 1
+fi
 
 set_network_volume_default
 write_runtime_instructions
