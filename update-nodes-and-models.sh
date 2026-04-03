@@ -29,6 +29,7 @@ if ! install_custom_nodes; then
     echo "❌ Custom node refresh failed."
     exit 1
 fi
+print_installed_custom_nodes_summary
 
 echo "Ensuring required models are installed..."
 if ! install_models_with_comfy_cli; then

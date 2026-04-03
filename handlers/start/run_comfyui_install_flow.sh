@@ -29,6 +29,7 @@ run_comfyui_install_flow() {
         echo "Custom node installation failed."
         return 1
     fi
+    print_installed_custom_nodes_summary
 
     echo "Installing required models..."
     if ! install_models_with_comfy_cli; then

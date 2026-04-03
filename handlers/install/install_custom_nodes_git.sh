@@ -105,3 +105,38 @@ install_custom_nodes() {
 
     return 0
 }
+
+
+print_installed_custom_nodes_summary() {
+    if [ -z "${INSTALL_MANIFEST_CUSTOM_NODES_FILE:-}" ] || [ ! -f "$INSTALL_MANIFEST_CUSTOM_NODES_FILE" ]; then
+        echo "⚠️ Custom node manifest summary unavailable."
+        return 0
+    fi
+
+    local -a custom_node_specs=()
+    if ! read_nonempty_lines "$INSTALL_MANIFEST_CUSTOM_NODES_FILE"; then
+        echo "⚠️ Failed to read custom node manifest entries for summary."
+        return 0
+    fi
+    custom_node_specs=("${READ_NONEMPTY_LINES[@]}")
+
+    echo "Installed custom nodes:"
+    if [ "${#custom_node_specs[@]}" -eq 0 ]; then
+        echo " - (none)"
+        return 0
+    fi
+
+    local spec
+    for spec in "${custom_node_specs[@]}"; do
+        local repo_dir
+        local repo_url
+        IFS=$'\t' read -r repo_dir repo_url <<< "$spec"
+        if [ -d "$CUSTOM_NODES_DIR/$repo_dir" ]; then
+            echo " - $repo_dir"
+        else
+            echo " - $repo_dir (missing on disk)"
+        fi
+    done
+
+    return 0
+}
