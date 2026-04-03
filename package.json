@@ -1,5 +1,5 @@
 {
-  "name": "dynamic-comfyui",
-  "private": true,
-  "version": "1.0.0"
+  "scripts": {
+    "setup-page-preview": "bash handlers/start/run_local_setup_page_preview.sh"
+  }
 }
