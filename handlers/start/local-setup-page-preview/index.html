@@ -1,27 +1,9 @@
-# shellcheck shell=bash
-
-
-serve_setup_instructions_page() {
-    local setup_dir
-    setup_dir="$(setup_page_dir_path)"
-    local setup_html="$setup_dir/index.html"
-    local setup_pid_file="/tmp/dynamic-comfyui-setup-page.pid"
-    local comfy_health_url="http://127.0.0.1:8188/system_stats"
-
-    # If ComfyUI is already reachable, don't start a placeholder page.
-    if is_http_reachable "$comfy_health_url" 2 5; then
-        return 0
-    fi
-
-    mkdir -p "$setup_dir"
-    setup_progress_mark_idle
-    cat > "$setup_html" <<'EOF'
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>ComfyUI Setup Required</title>
+  <title>ComfyUI Setup Page Local Preview</title>
   <style>
     :root { color-scheme: light; }
     body {
@@ -137,6 +119,24 @@ serve_setup_instructions_page() {
       from { transform: rotate(0deg); }
       to { transform: rotate(360deg); }
     }
+    .controls {
+      margin: 14px 0 6px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .controls button {
+      border: 1px solid #334155;
+      border-radius: 8px;
+      background: #0b1328;
+      color: #e2e8f0;
+      padding: 8px 10px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .controls button:hover {
+      background: #1f2937;
+    }
     a.inline-link {
       color: #93c5fd;
       text-decoration: underline;
@@ -156,7 +156,15 @@ serve_setup_instructions_page() {
       <li>Run <code>bash start.sh</code></li>
     </ol>
     <p>The installer downloads models and custom nodes, then starts ComfyUI on port 8188.</p>
-    <p class="hint">You can keep this tab open and refresh after installation completes.</p>
+    <p class="hint">Local preview controls below let you simulate setup progress states.</p>
+
+    <div class="controls">
+      <button type="button" id="btn-idle">Idle</button>
+      <button type="button" id="btn-running">Running</button>
+      <button type="button" id="btn-done">Done</button>
+      <button type="button" id="btn-failed">Failed</button>
+    </div>
+
     <section class="progress">
       <h2>Download checklist</h2>
       <p id="progress-status" class="status">Status: Pending</p>
@@ -165,6 +173,72 @@ serve_setup_instructions_page() {
     </section>
   </main>
   <script>
+    const mockStates = {
+      idle: {
+        status: "idle",
+        groups: {
+          default: { label: "Default resources", items: [] },
+          project: { label: "Project manifest", items: [] }
+        }
+      },
+      running: {
+        status: "running",
+        groups: {
+          default: {
+            label: "Default resources",
+            items: [
+              { target: "custom_nodes/download_to_directory_extension", checked: true },
+              { target: "models/checkpoints/default.safetensors", checked: false }
+            ]
+          },
+          project: {
+            label: "Project manifest",
+            items: [
+              { target: "custom_nodes/ComfyUI-Impact-Pack", checked: true },
+              { target: "models/loras/80082-v1.safetensors", checked: false },
+              { target: "models/text_encoders/qwen_2.5_vl_7b_fp8_scaled.safetensors", checked: false }
+            ]
+          }
+        }
+      },
+      done: {
+        status: "done",
+        groups: {
+          default: {
+            label: "Default resources",
+            items: [
+              { target: "custom_nodes/download_to_directory_extension", checked: true }
+            ]
+          },
+          project: {
+            label: "Project manifest",
+            items: [
+              { target: "custom_nodes/ComfyUI-Impact-Pack", checked: true },
+              { target: "models/loras/80082-v1.safetensors", checked: true }
+            ]
+          }
+        }
+      },
+      failed: {
+        status: "failed",
+        groups: {
+          default: {
+            label: "Default resources",
+            items: [
+              { target: "custom_nodes/download_to_directory_extension", checked: true }
+            ]
+          },
+          project: {
+            label: "Project manifest",
+            items: [
+              { target: "models/checkpoints/huslyorealismxl_v2.safetensors", checked: false },
+              { target: "models/ultralytics/segm/person_yolov8m-seg.pt", checked: false }
+            ]
+          }
+        }
+      }
+    };
+
     function buildJupyterUrl() {
       const current = window.location;
       const protocol = current.protocol || "https:";
@@ -173,8 +247,7 @@ serve_setup_instructions_page() {
       if (swapped !== host) {
         return `${protocol}//${swapped}/lab`;
       }
-      const fallbackHost = host;
-      return `${protocol}//${fallbackHost}:8888/lab`;
+      return `${protocol}//${host}:8888/lab`;
     }
 
     function setJupyterLink() {
@@ -191,6 +264,13 @@ serve_setup_instructions_page() {
         failed: "Failed",
       };
       return map[raw] || "Pending";
+    }
+
+    function groupCounts(group) {
+      const total = Array.isArray(group.items) ? group.items.length : 0;
+      const done = (group.items || []).filter((item) => item.checked).length;
+      const left = Math.max(total - done, 0);
+      return { total, done, left };
     }
 
     function renderProgress(payload) {
@@ -210,19 +290,13 @@ serve_setup_instructions_page() {
         (projectGroup.items || []).filter((item) => item.checked).length;
       const leftCount = Math.max(allCount - doneCount, 0);
       summaryEl.textContent = `${doneCount}/${allCount} complete • ${leftCount} left`;
+
       if (allCount === 0) {
         groupsEl.innerHTML = "<ul class=\"checklist\"><li>Waiting for installation to start...</li></ul>";
         return;
       }
 
       groupsEl.innerHTML = "";
-
-      function groupCounts(group) {
-        const total = Array.isArray(group.items) ? group.items.length : 0;
-        const done = (group.items || []).filter((item) => item.checked).length;
-        const left = Math.max(total - done, 0);
-        return { total, done, left };
-      }
 
       function renderGroup(group) {
         const wrapper = document.createElement("div");
@@ -231,16 +305,10 @@ serve_setup_instructions_page() {
         const counts = groupCounts(group);
         heading.textContent = `${group.label} (${counts.done}/${counts.total}, ${counts.left} left)`;
         wrapper.appendChild(heading);
+
         const listEl = document.createElement("ul");
         listEl.className = "checklist";
-        if (!Array.isArray(group.items) || group.items.length === 0) {
-          listEl.innerHTML = "<li>(none)</li>";
-          wrapper.appendChild(listEl);
-          groupsEl.appendChild(wrapper);
-          return;
-        }
-
-        for (const item of group.items) {
+        for (const item of group.items || []) {
           const li = document.createElement("li");
           const target = document.createElement("span");
           target.className = "target";
@@ -272,31 +340,16 @@ serve_setup_instructions_page() {
       renderGroup(projectGroup);
     }
 
-    async function pollProgress() {
-      try {
-        const res = await fetch(`/progress.json?t=${Date.now()}`, { cache: "no-store" });
-        if (!res.ok) return;
-        const payload = await res.json();
-        renderProgress(payload);
-      } catch (_err) {
-        // keep previous UI state on transient errors
-      }
+    function wireButtons() {
+      document.getElementById("btn-idle")?.addEventListener("click", () => renderProgress(mockStates.idle));
+      document.getElementById("btn-running")?.addEventListener("click", () => renderProgress(mockStates.running));
+      document.getElementById("btn-done")?.addEventListener("click", () => renderProgress(mockStates.done));
+      document.getElementById("btn-failed")?.addEventListener("click", () => renderProgress(mockStates.failed));
     }
 
     setJupyterLink();
-    pollProgress();
-    setInterval(pollProgress, 2000);
+    wireButtons();
+    renderProgress(mockStates.running);
   </script>
 </body>
 </html>
-EOF
-
-    # If something else already binds 8188, do nothing and keep startup resilient.
-    if is_http_reachable "http://127.0.0.1:8188" 2 5; then
-        return 0
-    fi
-
-    nohup python3 -m http.server 8188 --bind 0.0.0.0 --directory "$setup_dir" >/tmp/dynamic-comfyui-setup-page.log 2>&1 &
-    echo $! > "$setup_pid_file"
-    echo "Serving setup instructions on port 8188 until ComfyUI starts."
-}
