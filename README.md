@@ -33,7 +33,7 @@ Example (`<URL>.json`):
 
 Global default resources are fetched from the URL configured in:
 
-- `settings.json` (`default_resources_url`)
+- `package.json` (`default_resources_url`)
 
 This lets you update defaults without rebuilding the image: edit the hosted JSON file at that URL.
 
