@@ -189,7 +189,7 @@ serve_setup_instructions_page() {
       const current = window.location;
       const protocol = current.protocol || "https:";
       const host = current.hostname || "";
-      const swapped = host.replace(/-8188(?=\\.)/, "-8888");
+      const swapped = host.replace(/-8188(?=\.|$)/, "-8888");
       if (swapped !== host) {
         return `${protocol}//${swapped}/lab`;
       }
