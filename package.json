@@ -1,6 +1,6 @@
 {
   "default_resources_url": "https://github.com/jeremytenjo/dynamic-comfyui/blob/main/default-resources.json",
   "scripts": {
-    "setup-page-preview": "bash handlers/start/run_local_setup_page_preview.sh"
+    "setup-page-preview": "bash handlers/start/run_local_setup_page_preview.sh 8188"
   }
 }
