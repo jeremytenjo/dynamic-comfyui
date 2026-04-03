@@ -61,7 +61,7 @@ COPY update-nodes-and-models.sh /update-nodes-and-models.sh
 COPY restart-comfyui.sh /restart-comfyui.sh
 COPY help.sh /help.sh
 COPY settings.json /settings.json
-COPY default-resources.yaml /default-resources.yaml
+COPY default-resources.json /default-resources.json
 COPY projects /projects
 COPY handlers /handlers
 

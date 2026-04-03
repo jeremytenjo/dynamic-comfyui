@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 
 import argparse
+import json
 import shlex
 import sys
 from pathlib import Path
 from typing import Dict, List, Tuple
-
-import yaml
 
 
 def fail(message: str) -> None:
@@ -14,11 +13,11 @@ def fail(message: str) -> None:
     raise SystemExit(1)
 
 
-def load_yaml_mapping(path: Path, label: str) -> dict:
+def load_json_mapping(path: Path, label: str) -> dict:
     try:
-        data = yaml.safe_load(path.read_text(encoding="utf-8"))
+        data = json.loads(path.read_text(encoding="utf-8"))
     except Exception as exc:
-        fail(f"Failed to parse YAML for {label} ({path}): {exc}")
+        fail(f"Failed to parse JSON for {label} ({path}): {exc}")
     if data is None:
         return {}
     if not isinstance(data, dict):
@@ -118,12 +117,12 @@ def parse_url_target_list(raw_items, label: str) -> List[Tuple[str, str]]:
 
 
 def write_merge_outputs(project_manifest_path: Path, default_manifest_path: Path, out_dir: Path) -> None:
-    project_manifest = load_yaml_mapping(project_manifest_path, "Project manifest")
+    project_manifest = load_json_mapping(project_manifest_path, "Project manifest")
     default_manifest = {}
     if default_manifest_path and default_manifest_path.exists():
         if not default_manifest_path.is_file():
             fail(f"Default resources manifest path is not a file: {default_manifest_path}")
-        default_manifest = load_yaml_mapping(default_manifest_path, "Default resources manifest")
+        default_manifest = load_json_mapping(default_manifest_path, "Default resources manifest")
 
     default_custom_nodes = parse_custom_nodes(default_manifest.get("custom_nodes"), "default custom_nodes")
     project_custom_nodes = parse_custom_nodes(project_manifest.get("custom_nodes"), "project custom_nodes")
@@ -207,7 +206,7 @@ def write_merge_outputs(project_manifest_path: Path, default_manifest_path: Path
 
 
 def write_cleanup_outputs(manifest_path: Path, out_dir: Path) -> None:
-    manifest = load_yaml_mapping(manifest_path, "Project manifest")
+    manifest = load_json_mapping(manifest_path, "Project manifest")
     custom_node_dirs = parse_custom_node_dirs_for_cleanup(manifest.get("custom_nodes"), "custom_nodes")
     models = parse_url_target_list(manifest.get("models"), "models")
     files = parse_url_target_list(manifest.get("files"), "files")

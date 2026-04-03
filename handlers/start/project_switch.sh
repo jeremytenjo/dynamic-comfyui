@@ -14,7 +14,7 @@ capture_previous_project_state_for_switch() {
     PREVIOUS_PROJECT_SOURCE_URL="${SAVED_PROJECT_SOURCE_URL:-}"
 
     if [ -f "$SAVED_PROJECT_MANIFEST_PATH" ]; then
-        PREVIOUS_MANIFEST_SNAPSHOT_PATH="$(mktemp /tmp/dynamic-comfyui-previous-project-manifest.XXXXXX.yaml)"
+        PREVIOUS_MANIFEST_SNAPSHOT_PATH="$(mktemp /tmp/dynamic-comfyui-previous-project-manifest.XXXXXX.json)"
         cp -f "$SAVED_PROJECT_MANIFEST_PATH" "$PREVIOUS_MANIFEST_SNAPSHOT_PATH"
     fi
 

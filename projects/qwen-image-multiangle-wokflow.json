@@ -1,0 +1,90 @@
+{
+  "custom_nodes": [
+    {
+      "repo_dir": "ComfyUI-Manager",
+      "repo": "https://github.com/ltdrdata/ComfyUI-Manager.git"
+    },
+    {
+      "repo_dir": "ComfyUI-KJNodes",
+      "repo": "https://github.com/kijai/ComfyUI-KJNodes.git"
+    },
+    {
+      "repo_dir": "rgthree-comfy",
+      "repo": "https://github.com/rgthree/rgthree-comfy.git"
+    },
+    {
+      "repo_dir": "ComfyUI-Impact-Pack",
+      "repo": "https://github.com/ltdrdata/ComfyUI-Impact-Pack.git"
+    },
+    {
+      "repo_dir": "ComfyUI-Impact-Subpack",
+      "repo": "https://github.com/ltdrdata/ComfyUI-Impact-Subpack.git"
+    },
+    {
+      "repo_dir": "ComfyUI_Comfyroll_CustomNodes",
+      "repo": "https://github.com/Suzie1/ComfyUI_Comfyroll_CustomNodes.git"
+    },
+    {
+      "repo_dir": "RES4LYF",
+      "repo": "https://github.com/ClownsharkBatwing/RES4LYF.git"
+    },
+    {
+      "repo_dir": "comfyui-Huslyo123RealismNode-V2",
+      "repo": "https://huggingface.co/spaces/Huslyo123/comfyui-Huslyo123RealismNode-V2"
+    },
+    {
+      "repo_dir": "ComfyUI-SeedVR2_VideoUpscaler",
+      "repo": "https://github.com/numz/ComfyUI-SeedVR2_VideoUpscaler.git"
+    }
+  ],
+  "models": [
+    {
+      "url": "https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth",
+      "target": "models/sams/sam_vit_b_01ec64.pth"
+    },
+    {
+      "url": "https://huggingface.co/aidiffuser/Qwen-Image-Edit-2509/resolve/main/Qwen-Image-Edit-2509_bf16.safetensors",
+      "target": "models/diffusion_models/Qwen-Image-Edit-2509_bf16.safetensors"
+    },
+    {
+      "url": "https://huggingface.co/f5aiteam/CLIP/resolve/main/qwen_2.5_vl_7b_fp8_scaled.safetensors",
+      "target": "models/text_encoders/qwen_2.5_vl_7b_fp8_scaled.safetensors"
+    },
+    {
+      "url": "https://huggingface.co/Comfy-Org/Qwen-Image_ComfyUI/resolve/main/split_files/vae/qwen_image_vae.safetensors",
+      "target": "models/vae/qwen_image_vae.safetensors"
+    },
+    {
+      "url": "https://huggingface.co/lightx2v/Qwen-Image-Lightning/resolve/main/Qwen-Image-Lightning-8steps-V2.0-bf16.safetensors",
+      "target": "models/loras/Qwen-Image-Lightning-8steps-V2.0-bf16.safetensors"
+    },
+    {
+      "url": "https://huggingface.co/dx8152/Qwen-Edit-2509-Multiple-angles/resolve/main/%E9%95%9C%E5%A4%B4%E8%BD%AC%E6%8D%A2.safetensors",
+      "target": "models/loras/multiangle.safetensors"
+    },
+    {
+      "url": "https://civitai.com/api/download/models/2399863",
+      "target": "models/checkpoints/huslyorealismxl_v2.safetensors"
+    },
+    {
+      "url": "https://huggingface.co/Kentus/Adetailer/resolve/main/nipple.pt",
+      "target": "models/ultralytics/bbox/nipple.pt"
+    },
+    {
+      "url": "https://huggingface.co/Bingsu/adetailer/resolve/main/person_yolov8m-seg.pt",
+      "target": "models/ultralytics/segm/person_yolov8m-seg.pt"
+    },
+    {
+      "url": "https://huggingface.co/AunyMoons/loras-pack/resolve/843812eeece00c067cd1987e97cee2f7f961df40/pussyV2.pt",
+      "target": "models/ultralytics/bbox/pussyV2.pt"
+    },
+    {
+      "url": "https://huggingface.co/numz/SeedVR2_comfyUI/resolve/main/seedvr2_ema_7b_fp16.safetensors",
+      "target": "models/SEEDVR2/seedvr2_ema_7b_fp16.safetensors"
+    },
+    {
+      "url": "https://huggingface.co/numz/SeedVR2_comfyUI/resolve/main/ema_vae_fp16.safetensors",
+      "target": "models/SEEDVR2/ema_vae_fp16.safetensors"
+    }
+  ]
+}

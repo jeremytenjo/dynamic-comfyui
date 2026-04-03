@@ -2,7 +2,7 @@
 
 
 active_project_manifest_path() {
-    echo "$NETWORK_VOLUME/projects/active-project.yaml"
+    echo "$NETWORK_VOLUME/projects/active-project.json"
 }
 
 
@@ -25,11 +25,11 @@ normalize_project_manifest_url() {
 
 validate_project_manifest_url() {
     local candidate_url="$1"
-    if [[ "$candidate_url" =~ ^https?://.+\.(yaml|yml)(\?.*)?$ ]]; then
+    if [[ "$candidate_url" =~ ^https?://.+\.json(\?.*)?$ ]]; then
         return 0
     fi
 
-    echo "❌ Invalid YAML URL. Expected HTTP(S) URL ending in .yaml or .yml"
+    echo "❌ Invalid JSON URL. Expected HTTP(S) URL ending in .json"
     return 1
 }
 
@@ -61,7 +61,7 @@ prompt_and_prepare_project_manifest_from_url() {
     while true; do
         read -r -p "Enter project URL: " source_url
         if [ -z "$source_url" ]; then
-            echo "❌ YAML URL is required."
+            echo "❌ JSON URL is required."
             continue
         fi
 
@@ -115,7 +115,7 @@ refresh_project_manifest_from_saved_url() {
 
     saved_source_url="$(normalize_project_manifest_url "$saved_source_url")"
     if ! validate_project_manifest_url "$saved_source_url"; then
-        echo "❌ Saved project URL is invalid. Run 'bash start.sh' and enter a valid YAML URL."
+        echo "❌ Saved project URL is invalid. Run 'bash start.sh' and enter a valid JSON URL."
         return 1
     fi
 

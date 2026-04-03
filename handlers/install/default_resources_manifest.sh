@@ -45,14 +45,14 @@ PY
 
 resolve_default_resources_manifest() {
     local manifest_tmp_dir="$1"
-    local fetched_manifest_path="$manifest_tmp_dir/default-resources-remote.yaml"
-    local empty_manifest_path="$manifest_tmp_dir/default-resources-empty.yaml"
+    local fetched_manifest_path="$manifest_tmp_dir/default-resources-remote.json"
+    local empty_manifest_path="$manifest_tmp_dir/default-resources-empty.json"
     local baked_manifest_path=""
     local settings_path=""
     local default_resources_url=""
 
     if [ -n "${SCRIPT_DIR:-}" ]; then
-        baked_manifest_path="$SCRIPT_DIR/default-resources.yaml"
+        baked_manifest_path="$SCRIPT_DIR/default-resources.json"
     fi
 
     settings_path="$(default_resources_settings_path)"
@@ -80,9 +80,11 @@ resolve_default_resources_manifest() {
     fi
 
     cat > "$empty_manifest_path" <<'EOF'
-custom_nodes: []
-models: []
-files: []
+{
+  "custom_nodes": [],
+  "models": [],
+  "files": []
+}
 EOF
     printf '%s\n' "$empty_manifest_path"
     return 0
