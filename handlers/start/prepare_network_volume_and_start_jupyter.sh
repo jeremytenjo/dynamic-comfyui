@@ -27,7 +27,6 @@ prepare_network_volume_and_start_jupyter() {
     # Use explicit ServerApp options so proxy target is deterministic on RunPod.
     nohup "${jupyter_cmd[@]}" \
         --ip=0.0.0.0 \
-        --port=8888 \
         --ServerApp.port=8888 \
         --ServerApp.port_retries=0 \
         --allow-root \
