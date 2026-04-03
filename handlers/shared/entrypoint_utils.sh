@@ -57,9 +57,22 @@ read_nonempty_lines() {
 curl_download_to_file() {
     local source_url="$1"
     local target_path="$2"
+    local -a curl_args=()
 
     mkdir -p "$(dirname "$target_path")"
-    if ! curl --silent --show-error --fail --location "$source_url" --output "$target_path"; then
+    curl_args=(--silent --show-error --fail --location)
+
+    if [[ "$source_url" =~ ^https?://(www\.)?huggingface\.co/ ]]; then
+        if [ "${REQUIRE_HUGGINGFACE_TOKEN:-0}" = "1" ]; then
+            if [ -z "${HF_TOKEN:-}" ]; then
+                echo "❌ Hugging Face token is required but not set for URL: $source_url"
+                return 1
+            fi
+            curl_args+=(--header "Authorization: Bearer ${HF_TOKEN}")
+        fi
+    fi
+
+    if ! curl "${curl_args[@]}" "$source_url" --output "$target_path"; then
         return 1
     fi
 

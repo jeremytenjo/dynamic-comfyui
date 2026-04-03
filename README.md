@@ -8,6 +8,7 @@ Example (`<URL>.json`):
 
 ```json
 {
+  "require_huggingface_token": false,
   "custom_nodes": [
     {
       "repo_dir": "ComfyUI-Easy-Use",
@@ -27,6 +28,28 @@ Example (`<URL>.json`):
 }
 ```
 
+### Optional Hugging Face Token Requirement
+
+Project manifests can require a Hugging Face token for file downloads:
+
+```json
+{
+  "require_huggingface_token": true,
+  "files": [
+    {
+      "url": "https://huggingface.co/example/private-model/resolve/main/model.safetensors",
+      "target": "models/checkpoints/model.safetensors"
+    }
+  ]
+}
+```
+
+Behavior when `require_huggingface_token` is `true`:
+
+- The installer prompts for a Hugging Face token before installation.
+- If the token is empty, installation stops immediately.
+- The token is used only for that run and is not saved.
+
 ## Default Resources (All Projects)
 
 Global default resources are fetched from the URL configured in:
@@ -41,6 +64,7 @@ Manifest format:
 
 ```json
 {
+  "require_huggingface_token": false,
   "custom_nodes": [
     {
       "repo_dir": "example-node",
@@ -75,4 +99,4 @@ Manifest format:
   Enter a new JSON URL (or press Enter for defaults-only), remove previous project resources, then reinstall/start the selected project resources.
 
 - `bash update-nodes-and-models.sh`
-  Re-download the last saved JSON URL (or refresh defaults-only if URL is empty), refresh nodes/files, then restart ComfyUI.
+  Re-download the last saved JSON URL (or refresh defaults-only if URL is empty), refresh nodes/files, then restart ComfyUI. If the saved project manifest sets `require_huggingface_token: true`, you will be prompted for a token again.

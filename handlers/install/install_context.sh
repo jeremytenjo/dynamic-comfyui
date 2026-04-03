@@ -8,6 +8,10 @@ prepare_manifest_install_context() {
         return 1
     fi
 
+    if ! configure_manifest_huggingface_auth; then
+        return 1
+    fi
+
     if ! ensure_comfyui_workspace; then
         return 1
     fi

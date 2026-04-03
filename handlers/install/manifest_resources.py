@@ -30,6 +30,13 @@ def fail_if_models_key_present(manifest: dict, label: str) -> None:
         fail(f"{label} uses unsupported key 'models'. Move entries under 'files'.")
 
 
+def validate_require_huggingface_token(manifest: dict, label: str) -> None:
+    if "require_huggingface_token" not in manifest:
+        return
+    if not isinstance(manifest["require_huggingface_token"], bool):
+        fail(f"{label} field 'require_huggingface_token' must be a boolean.")
+
+
 def validate_target(value: str, label: str, idx: int) -> str:
     target_value = value.strip()
     target_path = Path(target_value)
@@ -124,6 +131,7 @@ def parse_url_target_list(raw_items, label: str) -> List[Tuple[str, str]]:
 def write_merge_outputs(project_manifest_path: Path, default_manifest_path: Path, out_dir: Path) -> None:
     project_manifest = load_json_mapping(project_manifest_path, "Project manifest")
     fail_if_models_key_present(project_manifest, "Project manifest")
+    validate_require_huggingface_token(project_manifest, "Project manifest")
 
     default_manifest = {}
     if default_manifest_path and default_manifest_path.exists():
@@ -131,6 +139,7 @@ def write_merge_outputs(project_manifest_path: Path, default_manifest_path: Path
             fail(f"Default resources manifest path is not a file: {default_manifest_path}")
         default_manifest = load_json_mapping(default_manifest_path, "Default resources manifest")
         fail_if_models_key_present(default_manifest, "Default resources manifest")
+        validate_require_huggingface_token(default_manifest, "Default resources manifest")
 
     default_custom_nodes = parse_custom_nodes(default_manifest.get("custom_nodes"), "default custom_nodes")
     project_custom_nodes = parse_custom_nodes(project_manifest.get("custom_nodes"), "project custom_nodes")
@@ -190,6 +199,7 @@ def write_merge_outputs(project_manifest_path: Path, default_manifest_path: Path
 def write_cleanup_outputs(manifest_path: Path, out_dir: Path) -> None:
     manifest = load_json_mapping(manifest_path, "Project manifest")
     fail_if_models_key_present(manifest, "Project manifest")
+    validate_require_huggingface_token(manifest, "Project manifest")
 
     custom_node_dirs = parse_custom_node_dirs_for_cleanup(manifest.get("custom_nodes"), "custom_nodes")
     files = parse_url_target_list(manifest.get("files"), "files")
