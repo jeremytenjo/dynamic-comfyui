@@ -2,7 +2,8 @@
 
 
 serve_setup_instructions_page() {
-    local setup_dir="/tmp/dynamic-comfyui-setup-page"
+    local setup_dir
+    setup_dir="$(setup_page_dir_path)"
     local setup_html="$setup_dir/index.html"
     local setup_pid_file="/tmp/dynamic-comfyui-setup-page.pid"
     local comfy_health_url="http://127.0.0.1:8188/system_stats"
@@ -13,6 +14,7 @@ serve_setup_instructions_page() {
     fi
 
     mkdir -p "$setup_dir"
+    setup_progress_mark_idle
     cat > "$setup_html" <<'EOF'
 <!doctype html>
 <html lang="en">
@@ -58,6 +60,58 @@ serve_setup_instructions_page() {
       color: #93c5fd;
       font-size: 14px;
     }
+    .progress {
+      margin-top: 18px;
+      padding-top: 16px;
+      border-top: 1px solid #334155;
+    }
+    .progress h2 {
+      margin: 0 0 8px;
+      font-size: 20px;
+    }
+    .status {
+      margin: 0 0 12px;
+      font-size: 14px;
+      color: #cbd5e1;
+    }
+    .checklist {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      display: grid;
+      gap: 8px;
+      max-height: 260px;
+      overflow: auto;
+    }
+    .checklist li {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      color: #cbd5e1;
+      background: #0b1328;
+      border: 1px solid #1f2a44;
+      border-radius: 8px;
+      padding: 8px 10px;
+    }
+    .checklist input[type="checkbox"] {
+      margin: 0;
+      accent-color: #22c55e;
+    }
+    .kind {
+      color: #93c5fd;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      margin-left: auto;
+    }
+    a.inline-link {
+      color: #93c5fd;
+      text-decoration: underline;
+    }
+    a.inline-link:hover {
+      color: #bfdbfe;
+    }
   </style>
 </head>
 <body>
@@ -65,13 +119,98 @@ serve_setup_instructions_page() {
     <h1>ComfyUI is not installed yet</h1>
     <p>Finish one-time setup from Jupyter, then this port will switch to ComfyUI automatically.</p>
     <ol>
-      <li>Open Jupyter Lab (port 8888).</li>
+      <li>Open <a id="jupyter-link" class="inline-link" href="#" target="_blank" rel="noopener noreferrer">Jupyter Lab (port 8888)</a>.</li>
       <li>Open a terminal in Jupyter.</li>
       <li>Run <code>bash start.sh</code></li>
     </ol>
     <p>The installer downloads models and custom nodes, then starts ComfyUI on port 8188.</p>
     <p class="hint">You can keep this tab open and refresh after installation completes.</p>
+    <section class="progress">
+      <h2>Download checklist</h2>
+      <p id="progress-status" class="status">Status: Pending</p>
+      <ul id="progress-checklist" class="checklist">
+        <li>Waiting for installation to start...</li>
+      </ul>
+    </section>
   </main>
+  <script>
+    function buildJupyterUrl() {
+      const current = window.location;
+      const protocol = current.protocol || "https:";
+      const host = current.hostname || "";
+      const swapped = host.replace(/-8188(?=\\.)/, "-8888");
+      if (swapped !== host) {
+        return `${protocol}//${swapped}/lab`;
+      }
+      const fallbackHost = host;
+      return `${protocol}//${fallbackHost}:8888/lab`;
+    }
+
+    function setJupyterLink() {
+      const el = document.getElementById("jupyter-link");
+      if (!el) return;
+      el.href = buildJupyterUrl();
+    }
+
+    function humanStatus(raw) {
+      const map = {
+        idle: "Pending",
+        running: "Running",
+        done: "Done",
+        failed: "Failed",
+      };
+      return map[raw] || "Pending";
+    }
+
+    function renderProgress(payload) {
+      const statusEl = document.getElementById("progress-status");
+      const listEl = document.getElementById("progress-checklist");
+      if (!statusEl || !listEl) return;
+
+      const statusText = humanStatus(payload?.status);
+      const message = payload?.message ? ` — ${payload.message}` : "";
+      statusEl.textContent = `Status: ${statusText}${message}`;
+
+      const items = Array.isArray(payload?.items) ? payload.items : [];
+      if (items.length === 0) {
+        listEl.innerHTML = "<li>Waiting for installation to start...</li>";
+        return;
+      }
+
+      listEl.innerHTML = "";
+      for (const item of items) {
+        const li = document.createElement("li");
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.disabled = true;
+        checkbox.checked = Boolean(item.checked);
+        const target = document.createElement("span");
+        target.textContent = item.target || "(unknown target)";
+        const kind = document.createElement("span");
+        kind.className = "kind";
+        kind.textContent = item.kind || "item";
+        li.appendChild(checkbox);
+        li.appendChild(target);
+        li.appendChild(kind);
+        listEl.appendChild(li);
+      }
+    }
+
+    async function pollProgress() {
+      try {
+        const res = await fetch(`/progress.json?t=${Date.now()}`, { cache: "no-store" });
+        if (!res.ok) return;
+        const payload = await res.json();
+        renderProgress(payload);
+      } catch (_err) {
+        // keep previous UI state on transient errors
+      }
+    }
+
+    setJupyterLink();
+    pollProgress();
+    setInterval(pollProgress, 2000);
+  </script>
 </body>
 </html>
 EOF

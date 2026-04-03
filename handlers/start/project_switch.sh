@@ -49,26 +49,35 @@ remove_previous_project_resources_and_reinstall_selected() {
 
     echo "Refreshing selected project resources after cleanup..."
     if ! prepare_manifest_install_context; then
+        setup_progress_mark_failed "Failed to prepare install context after cleanup."
         return 1
     fi
+    setup_progress_init
     if ! install_custom_nodes; then
+        setup_progress_mark_failed "Failed to reinstall selected project custom nodes after cleanup."
         echo "❌ Failed to reinstall selected project custom nodes after cleanup."
         return 1
     fi
     print_installed_custom_nodes_summary
     if ! install_models_with_comfy_cli; then
+        setup_progress_mark_failed "Failed to reinstall selected project models after cleanup."
         echo "❌ Failed to reinstall selected project models after cleanup."
         return 1
     fi
+    setup_progress_refresh
     print_installed_models_summary
     if ! install_files; then
+        setup_progress_mark_failed "Failed to reinstall selected project files after cleanup."
         echo "❌ Failed to reinstall selected project files after cleanup."
         return 1
     fi
+    setup_progress_refresh
     print_installed_files_summary
     if ! start_comfyui_service; then
+        setup_progress_mark_failed "Failed to start ComfyUI service after cleanup reinstall."
         return 1
     fi
+    setup_progress_mark_done
     print_installed_resources_summary
 
     return 0
