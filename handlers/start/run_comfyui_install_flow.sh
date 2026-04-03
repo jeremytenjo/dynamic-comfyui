@@ -51,6 +51,8 @@ run_comfyui_install_flow() {
         return 1
     fi
 
+    print_installed_resources_summary
+
     echo "✅ Installation complete and ComfyUI is ready on port 8188."
     return 0
 }

@@ -51,4 +51,6 @@ if ! bash /restart-comfyui.sh; then
     exit 1
 fi
 
+print_installed_resources_summary
+
 echo "✅ Node, model, and file refresh complete. ComfyUI restarted."

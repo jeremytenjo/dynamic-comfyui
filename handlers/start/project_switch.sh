@@ -69,6 +69,7 @@ remove_previous_project_resources_and_reinstall_selected() {
     if ! start_comfyui_service; then
         return 1
     fi
+    print_installed_resources_summary
 
     return 0
 }
