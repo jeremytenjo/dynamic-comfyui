@@ -2,7 +2,24 @@
 
 Define your files and custom nodes in templates for easy ComfyUI environment setup on RunPod.
 
-## Template Format
+## Commands
+
+- `bash start.sh`
+  Enter a JSON URL (or press Enter for defaults-only), then install/start ComfyUI.
+
+- `bash start-new-project.sh`
+  Enter a new JSON URL (or press Enter for defaults-only) and optionally clean resources from the previously selected project.
+
+- `bash add-project.sh`
+  Enter a new JSON URL (or press Enter for defaults-only) and add missing nodes/files without removing existing resources.
+
+- `bash replace-project.sh`
+  Enter a new JSON URL (or press Enter for defaults-only), remove previous project resources, then reinstall/start the selected project resources.
+
+- `bash update-nodes-and-models.sh`
+  Re-download the last saved JSON URL (or refresh defaults-only if URL is empty), refresh nodes/files, then restart ComfyUI. If the saved project manifest sets `require_huggingface_token: true`, you will be prompted for a token again.
+
+## Project File Format
 
 Example (`<URL>.json`):
 
@@ -84,20 +101,3 @@ Manifest format:
   ]
 }
 ```
-
-## Commands
-
-- `bash start.sh`
-  Enter a JSON URL (or press Enter for defaults-only), then install/start ComfyUI.
-
-- `bash start-new-project.sh`
-  Enter a new JSON URL (or press Enter for defaults-only) and optionally clean resources from the previously selected project.
-
-- `bash add-project.sh`
-  Enter a new JSON URL (or press Enter for defaults-only) and add missing nodes/files without removing existing resources.
-
-- `bash replace-project.sh`
-  Enter a new JSON URL (or press Enter for defaults-only), remove previous project resources, then reinstall/start the selected project resources.
-
-- `bash update-nodes-and-models.sh`
-  Re-download the last saved JSON URL (or refresh defaults-only if URL is empty), refresh nodes/files, then restart ComfyUI. If the saved project manifest sets `require_huggingface_token: true`, you will be prompted for a token again.
