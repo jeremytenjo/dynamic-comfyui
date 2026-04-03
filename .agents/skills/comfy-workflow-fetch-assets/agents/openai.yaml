@@ -1,0 +1,4 @@
+interface:
+  display_name: "Comfy Workflow Asset Fetcher"
+  short_description: "Build manifests from workflow with Playwright checks"
+  default_prompt: "Extract workflow requirements, use Playwright to find and validate correct node/file links, then produce a manifest with require_huggingface_token set when Hugging Face auth is required."
