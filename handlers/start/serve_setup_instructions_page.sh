@@ -82,8 +82,11 @@ serve_setup_instructions_page() {
     .message {
       margin: 0 0 12px;
       font-size: 13px;
-      color: #fca5a5;
+      color: #cbd5e1;
       word-break: break-word;
+    }
+    .message-error {
+      color: #fca5a5;
     }
     .checklist {
       margin: 0;
@@ -220,6 +223,7 @@ serve_setup_instructions_page() {
       const statusText = humanStatus(payload?.status);
       statusEl.textContent = `Status: ${statusText}`;
       messageEl.textContent = payload?.message || "";
+      messageEl.classList.toggle("message-error", payload?.status === "failed");
       const isRunning = payload?.status === "running";
 
       const defaultGroup = payload?.groups?.default || { label: "Default resources", items: [] };
@@ -230,7 +234,7 @@ serve_setup_instructions_page() {
       const leftCount = Math.max(allCount - doneCount, 0);
       summaryEl.textContent = `${doneCount}/${allCount} complete • ${leftCount} left`;
       if (allCount === 0) {
-        groupsEl.innerHTML = "<ul class=\"checklist\"><li>Waiting for installation to start...</li></ul>";
+        groupsEl.innerHTML = "<ul class=\"checklist\"><li>No checklist items yet.</li></ul>";
         return;
       }
 
