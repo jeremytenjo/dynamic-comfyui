@@ -41,11 +41,13 @@ read_nonempty_lines() {
     fi
 
     READ_NONEMPTY_LINES=()
+    READ_NONEMPTY_LINES_COUNT=0
 
     local line
     while IFS= read -r line; do
         [ -n "$line" ] || continue
         READ_NONEMPTY_LINES+=("$line")
+        READ_NONEMPTY_LINES_COUNT=$((READ_NONEMPTY_LINES_COUNT + 1))
     done < "$input_file"
 
     return 0

@@ -73,7 +73,9 @@ install_models_with_comfy_cli() {
         echo "❌ Failed to read model install manifest entries: $INSTALL_MANIFEST_MODELS_FILE"
         return 1
     fi
-    model_specs=("${READ_NONEMPTY_LINES[@]}")
+    if [ "${READ_NONEMPTY_LINES_COUNT:-0}" -gt 0 ]; then
+        model_specs=("${READ_NONEMPTY_LINES[@]}")
+    fi
 
     if [ "${#model_specs[@]}" -eq 0 ]; then
         echo "No models defined in install manifest; skipping model installation."
@@ -141,19 +143,31 @@ install_models_with_comfy_cli() {
 
 
 print_installed_models_summary() {
-    if [ -z "${INSTALL_MANIFEST_MODELS_FILE:-}" ] || [ ! -f "$INSTALL_MANIFEST_MODELS_FILE" ]; then
-        echo "⚠️ Model manifest summary unavailable."
+    print_installed_models_summary_from_file "Installed models (default resources):" "${INSTALL_MANIFEST_DEFAULT_MODELS_FILE:-}"
+    print_installed_models_summary_from_file "Installed models (project manifest):" "${INSTALL_MANIFEST_PROJECT_MODELS_FILE:-}"
+    return 0
+}
+
+
+print_installed_models_summary_from_file() {
+    local title="$1"
+    local manifest_file="$2"
+
+    echo "$title"
+    if [ -z "$manifest_file" ] || [ ! -f "$manifest_file" ]; then
+        echo " - (unavailable)"
         return 0
     fi
 
     local -a model_specs=()
-    if ! read_nonempty_lines "$INSTALL_MANIFEST_MODELS_FILE"; then
-        echo "⚠️ Failed to read model manifest entries for summary."
+    if ! read_nonempty_lines "$manifest_file"; then
+        echo " - (failed to read)"
         return 0
     fi
-    model_specs=("${READ_NONEMPTY_LINES[@]}")
+    if [ "${READ_NONEMPTY_LINES_COUNT:-0}" -gt 0 ]; then
+        model_specs=("${READ_NONEMPTY_LINES[@]}")
+    fi
 
-    echo "Installed models:"
     if [ "${#model_specs[@]}" -eq 0 ]; then
         echo " - (none)"
         return 0

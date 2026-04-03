@@ -152,6 +152,12 @@ def write_merge_outputs(project_manifest_path: Path, default_manifest_path: Path
     custom_nodes_file = out_dir / "custom_nodes.tsv"
     models_file = out_dir / "models.tsv"
     files_file = out_dir / "files.tsv"
+    default_custom_nodes_file = out_dir / "default_custom_nodes.tsv"
+    project_custom_nodes_file = out_dir / "project_custom_nodes.tsv"
+    default_models_file = out_dir / "default_models.tsv"
+    project_models_file = out_dir / "project_models.tsv"
+    default_files_file = out_dir / "default_files.tsv"
+    project_files_file = out_dir / "project_files.tsv"
 
     with custom_nodes_file.open("w", encoding="utf-8") as nf:
         for repo_dir, repo in merged_custom_nodes_by_repo_dir.items():
@@ -165,9 +171,39 @@ def write_merge_outputs(project_manifest_path: Path, default_manifest_path: Path
         for target, url in merged_files_by_target.items():
             ff.write(f"{url}\t{target}\n")
 
+    with default_custom_nodes_file.open("w", encoding="utf-8") as nf:
+        for repo_dir, repo in default_custom_nodes:
+            nf.write(f"{repo_dir}\t{repo}\n")
+
+    with project_custom_nodes_file.open("w", encoding="utf-8") as nf:
+        for repo_dir, repo in project_custom_nodes:
+            nf.write(f"{repo_dir}\t{repo}\n")
+
+    with default_models_file.open("w", encoding="utf-8") as mf:
+        for url, target in default_models:
+            mf.write(f"{url}\t{target}\n")
+
+    with project_models_file.open("w", encoding="utf-8") as mf:
+        for url, target in project_models:
+            mf.write(f"{url}\t{target}\n")
+
+    with default_files_file.open("w", encoding="utf-8") as ff:
+        for url, target in default_files:
+            ff.write(f"{url}\t{target}\n")
+
+    with project_files_file.open("w", encoding="utf-8") as ff:
+        for url, target in project_files:
+            ff.write(f"{url}\t{target}\n")
+
     print(f"export INSTALL_MANIFEST_CUSTOM_NODES_FILE={shlex.quote(str(custom_nodes_file))}")
     print(f"export INSTALL_MANIFEST_MODELS_FILE={shlex.quote(str(models_file))}")
     print(f"export INSTALL_MANIFEST_FILES_FILE={shlex.quote(str(files_file))}")
+    print(f"export INSTALL_MANIFEST_DEFAULT_CUSTOM_NODES_FILE={shlex.quote(str(default_custom_nodes_file))}")
+    print(f"export INSTALL_MANIFEST_PROJECT_CUSTOM_NODES_FILE={shlex.quote(str(project_custom_nodes_file))}")
+    print(f"export INSTALL_MANIFEST_DEFAULT_MODELS_FILE={shlex.quote(str(default_models_file))}")
+    print(f"export INSTALL_MANIFEST_PROJECT_MODELS_FILE={shlex.quote(str(project_models_file))}")
+    print(f"export INSTALL_MANIFEST_DEFAULT_FILES_FILE={shlex.quote(str(default_files_file))}")
+    print(f"export INSTALL_MANIFEST_PROJECT_FILES_FILE={shlex.quote(str(project_files_file))}")
 
 
 def write_cleanup_outputs(manifest_path: Path, out_dir: Path) -> None:

@@ -1,0 +1,7 @@
+custom_nodes:
+  - repo_dir: 'ComfyUI-Impact-Pack'
+    repo: 'https://github.com/ltdrdata/ComfyUI-Impact-Pack.git'
+
+models:
+  - url: 'https://huggingface.co/aidiffuser/Qwen-Image-Edit-2509/resolve/main/Qwen-Image-Edit-2509_bf16.safetensors'
+    target: 'models/diffusion_models/Qwen-Image-Edit-2509_bf16.safetensors'

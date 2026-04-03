@@ -32,7 +32,9 @@ install_files() {
         echo "❌ Failed to read file install manifest entries: $INSTALL_MANIFEST_FILES_FILE"
         return 1
     fi
-    file_specs=("${READ_NONEMPTY_LINES[@]}")
+    if [ "${READ_NONEMPTY_LINES_COUNT:-0}" -gt 0 ]; then
+        file_specs=("${READ_NONEMPTY_LINES[@]}")
+    fi
 
     if [ "${#file_specs[@]}" -eq 0 ]; then
         echo "No files defined in install manifest; skipping file installation."
@@ -67,19 +69,31 @@ install_files() {
 
 
 print_installed_files_summary() {
-    if [ -z "${INSTALL_MANIFEST_FILES_FILE:-}" ] || [ ! -f "$INSTALL_MANIFEST_FILES_FILE" ]; then
-        echo "⚠️ File manifest summary unavailable."
+    print_installed_files_summary_from_file "Installed files (default resources):" "${INSTALL_MANIFEST_DEFAULT_FILES_FILE:-}"
+    print_installed_files_summary_from_file "Installed files (project manifest):" "${INSTALL_MANIFEST_PROJECT_FILES_FILE:-}"
+    return 0
+}
+
+
+print_installed_files_summary_from_file() {
+    local title="$1"
+    local manifest_file="$2"
+
+    echo "$title"
+    if [ -z "$manifest_file" ] || [ ! -f "$manifest_file" ]; then
+        echo " - (unavailable)"
         return 0
     fi
 
     local -a file_specs=()
-    if ! read_nonempty_lines "$INSTALL_MANIFEST_FILES_FILE"; then
-        echo "⚠️ Failed to read file manifest entries for summary."
+    if ! read_nonempty_lines "$manifest_file"; then
+        echo " - (failed to read)"
         return 0
     fi
-    file_specs=("${READ_NONEMPTY_LINES[@]}")
+    if [ "${READ_NONEMPTY_LINES_COUNT:-0}" -gt 0 ]; then
+        file_specs=("${READ_NONEMPTY_LINES[@]}")
+    fi
 
-    echo "Installed files:"
     if [ "${#file_specs[@]}" -eq 0 ]; then
         echo " - (none)"
         return 0
