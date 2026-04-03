@@ -21,18 +21,19 @@ write_setup_progress_json() {
 
     mkdir -p "$setup_dir"
 
-    local models_file="${INSTALL_MANIFEST_MODELS_FILE:-}"
-    local files_file="${INSTALL_MANIFEST_FILES_FILE:-}"
+    local default_models_file="${INSTALL_MANIFEST_DEFAULT_MODELS_FILE:-}"
+    local project_models_file="${INSTALL_MANIFEST_PROJECT_MODELS_FILE:-}"
+    local default_files_file="${INSTALL_MANIFEST_DEFAULT_FILES_FILE:-}"
+    local project_files_file="${INSTALL_MANIFEST_PROJECT_FILES_FILE:-}"
     local comfyui_dir="${COMFYUI_DIR:-/workspace/ComfyUI}"
 
-    if ! python3 - "$progress_file" "$status" "$message" "$comfyui_dir" "$models_file" "$files_file" <<'PY'
+    if ! python3 - "$progress_file" "$status" "$message" "$comfyui_dir" "$default_models_file" "$project_models_file" "$default_files_file" "$project_files_file" <<'PY'
 import json
-import os
 import sys
 from pathlib import Path
 
 
-def read_targets(tsv_path: str, kind: str) -> list[dict]:
+def read_targets(tsv_path: str, kind: str, source: str) -> list[dict]:
     items = []
     if not tsv_path:
         return items
@@ -48,22 +49,25 @@ def read_targets(tsv_path: str, kind: str) -> list[dict]:
         if len(parts) != 2:
             continue
         _url, target = parts
-        items.append({"target": target, "kind": kind})
+        items.append({"target": target, "kind": kind, "source": source})
     return items
 
 
-if len(sys.argv) != 7:
+if len(sys.argv) != 9:
     raise SystemExit(1)
 
 progress_file = Path(sys.argv[1])
 status = sys.argv[2]
 message = sys.argv[3]
 comfyui_dir = Path(sys.argv[4])
-models_tsv = sys.argv[5]
-files_tsv = sys.argv[6]
+default_models_tsv = sys.argv[5]
+project_models_tsv = sys.argv[6]
+default_files_tsv = sys.argv[7]
+project_files_tsv = sys.argv[8]
 
-items = read_targets(models_tsv, "model") + read_targets(files_tsv, "file")
-for item in items:
+default_items = read_targets(default_models_tsv, "model", "default") + read_targets(default_files_tsv, "file", "default")
+project_items = read_targets(project_models_tsv, "model", "project") + read_targets(project_files_tsv, "file", "project")
+for item in default_items + project_items:
     item_path = comfyui_dir / item["target"]
     item["checked"] = item_path.is_file()
 
@@ -71,7 +75,16 @@ payload = {
     "status": status,
     "message": message,
     "updated_at": int(__import__("time").time()),
-    "items": items,
+    "groups": {
+        "default": {
+            "label": "Default resources",
+            "items": default_items,
+        },
+        "project": {
+            "label": "Project manifest",
+            "items": project_items,
+        },
+    },
 }
 
 progress_file.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")

@@ -94,16 +94,45 @@ serve_setup_instructions_page() {
       border-radius: 8px;
       padding: 8px 10px;
     }
+    .groups {
+      display: grid;
+      gap: 14px;
+    }
+    .group h3 {
+      margin: 0 0 8px;
+      font-size: 14px;
+      color: #93c5fd;
+      letter-spacing: 0.02em;
+    }
     .checklist input[type="checkbox"] {
       margin: 0;
       accent-color: #22c55e;
+    }
+    .target {
+      word-break: break-word;
+      flex: 1;
     }
     .kind {
       color: #93c5fd;
       font-size: 12px;
       text-transform: uppercase;
       letter-spacing: 0.03em;
-      margin-left: auto;
+      margin-left: 8px;
+    }
+    .item-state {
+      font-size: 12px;
+      color: #94a3b8;
+      margin-left: 8px;
+      white-space: nowrap;
+    }
+    .item-state.done {
+      color: #22c55e;
+    }
+    .item-state.loading {
+      color: #fbbf24;
+    }
+    .item-state.failed {
+      color: #f87171;
     }
     a.inline-link {
       color: #93c5fd;
@@ -128,9 +157,7 @@ serve_setup_instructions_page() {
     <section class="progress">
       <h2>Download checklist</h2>
       <p id="progress-status" class="status">Status: Pending</p>
-      <ul id="progress-checklist" class="checklist">
-        <li>Waiting for installation to start...</li>
-      </ul>
+      <div id="progress-groups" class="groups"></div>
     </section>
   </main>
   <script>
@@ -164,36 +191,73 @@ serve_setup_instructions_page() {
 
     function renderProgress(payload) {
       const statusEl = document.getElementById("progress-status");
-      const listEl = document.getElementById("progress-checklist");
-      if (!statusEl || !listEl) return;
+      const groupsEl = document.getElementById("progress-groups");
+      if (!statusEl || !groupsEl) return;
 
       const statusText = humanStatus(payload?.status);
       const message = payload?.message ? ` — ${payload.message}` : "";
       statusEl.textContent = `Status: ${statusText}${message}`;
 
-      const items = Array.isArray(payload?.items) ? payload.items : [];
-      if (items.length === 0) {
-        listEl.innerHTML = "<li>Waiting for installation to start...</li>";
+      const defaultGroup = payload?.groups?.default || { label: "Default resources", items: [] };
+      const projectGroup = payload?.groups?.project || { label: "Project manifest", items: [] };
+      const allCount = (defaultGroup.items?.length || 0) + (projectGroup.items?.length || 0);
+      if (allCount === 0) {
+        groupsEl.innerHTML = "<ul class=\"checklist\"><li>Waiting for installation to start...</li></ul>";
         return;
       }
 
-      listEl.innerHTML = "";
-      for (const item of items) {
-        const li = document.createElement("li");
-        const checkbox = document.createElement("input");
-        checkbox.type = "checkbox";
-        checkbox.disabled = true;
-        checkbox.checked = Boolean(item.checked);
-        const target = document.createElement("span");
-        target.textContent = item.target || "(unknown target)";
-        const kind = document.createElement("span");
-        kind.className = "kind";
-        kind.textContent = item.kind || "item";
-        li.appendChild(checkbox);
-        li.appendChild(target);
-        li.appendChild(kind);
-        listEl.appendChild(li);
+      groupsEl.innerHTML = "";
+
+      function itemState(item, flowStatus) {
+        if (item.checked) return { text: "Done", className: "done" };
+        if (flowStatus === "running") return { text: "Loading", className: "loading" };
+        if (flowStatus === "failed") return { text: "Failed", className: "failed" };
+        return { text: "Pending", className: "" };
       }
+
+      function renderGroup(group) {
+        const wrapper = document.createElement("div");
+        wrapper.className = "group";
+        const heading = document.createElement("h3");
+        heading.textContent = group.label;
+        wrapper.appendChild(heading);
+        const listEl = document.createElement("ul");
+        listEl.className = "checklist";
+        if (!Array.isArray(group.items) || group.items.length === 0) {
+          listEl.innerHTML = "<li>(none)</li>";
+          wrapper.appendChild(listEl);
+          groupsEl.appendChild(wrapper);
+          return;
+        }
+
+        for (const item of group.items) {
+          const li = document.createElement("li");
+          const checkbox = document.createElement("input");
+          checkbox.type = "checkbox";
+          checkbox.disabled = true;
+          checkbox.checked = Boolean(item.checked);
+          const target = document.createElement("span");
+          target.className = "target";
+          target.textContent = item.target || "(unknown target)";
+          const kind = document.createElement("span");
+          kind.className = "kind";
+          kind.textContent = item.kind || "item";
+          const state = itemState(item, payload?.status);
+          const stateEl = document.createElement("span");
+          stateEl.className = `item-state ${state.className}`.trim();
+          stateEl.textContent = state.text;
+          li.appendChild(checkbox);
+          li.appendChild(target);
+          li.appendChild(kind);
+          li.appendChild(stateEl);
+          listEl.appendChild(li);
+        }
+        wrapper.appendChild(listEl);
+        groupsEl.appendChild(wrapper);
+      }
+
+      renderGroup(defaultGroup);
+      renderGroup(projectGroup);
     }
 
     async function pollProgress() {
