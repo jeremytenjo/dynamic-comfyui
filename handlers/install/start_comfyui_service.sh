@@ -9,8 +9,16 @@ stop_existing_comfyui_service() {
 
 
 start_comfyui_service() {
-    local start_ts
-    start_ts=$(date +%s)
+    local now_ts
+    local metric_start_ts
+    now_ts=$(date +%s)
+    metric_start_ts="$now_ts"
+
+    # When running full install flow, include install/download time in startup metric.
+    if [ -n "${INSTALL_START_TS:-}" ] && [[ "${INSTALL_START_TS:-}" =~ ^[0-9]+$ ]] && [ "$INSTALL_START_TS" -le "$now_ts" ]; then
+        metric_start_ts="$INSTALL_START_TS"
+    fi
+
     local url="http://127.0.0.1:8188"
     local comfy_health_url="$url/system_stats"
     local -a comfy_args=(--listen --enable-manager --disable-cuda-malloc)
@@ -68,7 +76,7 @@ start_comfyui_service() {
     local elapsed_minutes
     local elapsed_remaining_seconds
     end_ts=$(date +%s)
-    elapsed_seconds=$((end_ts - start_ts))
+    elapsed_seconds=$((end_ts - metric_start_ts))
     elapsed_minutes=$((elapsed_seconds / 60))
     elapsed_remaining_seconds=$((elapsed_seconds % 60))
 
