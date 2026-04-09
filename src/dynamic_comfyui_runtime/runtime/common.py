@@ -81,9 +81,17 @@ def is_http_reachable(url: str, timeout: int = 5) -> bool:
 
 def download_file(url: str, target: Path, *, hf_token: str | None = None) -> None:
     ensure_dir(target.parent)
-    headers = {}
-    if "huggingface.co" in urllib.parse.urlparse(url).netloc and hf_token:
+    parsed = urllib.parse.urlparse(url)
+    host = parsed.netloc.lower()
+    headers = {
+        "Accept": "*/*",
+        "User-Agent": "dynamic-comfyui-runtime-downloader/1.0",
+    }
+    if "huggingface.co" in host and hf_token:
         headers["Authorization"] = f"Bearer {hf_token}"
+    if "civitai.com" in host:
+        headers["Referer"] = "https://civitai.com/"
+        headers["Origin"] = "https://civitai.com"
     req = urllib.request.Request(url, headers=headers, method="GET")
     try:
         with urllib.request.urlopen(req, timeout=120) as resp:  # noqa: S310
