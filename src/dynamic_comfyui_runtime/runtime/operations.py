@@ -131,7 +131,7 @@ def prompt_and_prepare_project_manifest(network_volume: Path) -> tuple[Path, str
             download_manifest(source_url, manifest_path)
             return manifest_path, source_url
         except Exception as exc:
-            print(f"Failed to download project manifest: {exc}")
+            print(f"❌ Failed to download project manifest: {exc}")
 
 
 def _load_manifest_context(ctx: RuntimeContext, project_manifest_path: Path) -> tuple[MergedManifest, str | None]:

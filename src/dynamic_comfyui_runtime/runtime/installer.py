@@ -59,7 +59,7 @@ def install_files(
                 download_file(file_spec.url, target_path, hf_token=hf_token)
             except Exception as exc:
                 failures += 1
-                print(f"Failed to download {file_spec.target}: {exc}")
+                print(f"❌ Failed to download {file_spec.target}: {exc}")
         if on_progress:
             on_progress()
 
