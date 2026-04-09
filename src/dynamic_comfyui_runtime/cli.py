@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import argparse
 import os
-import subprocess
-import sys
 from pathlib import Path
 
 from .runtime.operations import (
@@ -14,11 +12,10 @@ from .runtime.operations import (
     cmd_restart,
     cmd_start,
     cmd_start_new_project,
+    cmd_update_dc,
     cmd_update_nodes_and_models,
 )
-
-RUNTIME_WHEEL_URL = "https://github.com/jeremytenjo/dynamic-comfyui/releases/latest/download/dynamic_comfyui_runtime-latest-py3-none-any.whl"
-REEXEC_FLAG = "DYNAMIC_COMFYUI_RUNTIME_REEXECED"
+from .runtime.updater import REEXEC_FLAG, upgrade_runtime_package_and_reexec_install
 
 
 def _repo_root() -> Path:
@@ -46,22 +43,6 @@ def _context() -> RuntimeContext:
         package_json_path=_default_package_json_path(),
         setup_page_html_path=_default_setup_page_html_path(),
     )
-
-
-def _upgrade_runtime_package_and_reexec() -> int:
-    if os.environ.get(REEXEC_FLAG) == "1":
-        return 0
-
-    install = subprocess.run(
-        [sys.executable, "-m", "pip", "install", "--no-cache-dir", "--upgrade", RUNTIME_WHEEL_URL]
-    )
-    if install.returncode != 0:
-        print("Warning: failed to update runtime package from GitHub Releases. Continuing with installed version.")
-
-    env = os.environ.copy()
-    env[REEXEC_FLAG] = "1"
-    reexec = subprocess.run([sys.executable, "-m", "dynamic_comfyui_runtime.cli", "install"], env=env)
-    return reexec.returncode
 
 
 def _help_text() -> str:
@@ -93,6 +74,9 @@ def _help_text() -> str:
 - dynamic-comfyui restart
   Restart ComfyUI service.
 
+- dynamic-comfyui update-dc
+  Update dynamic-comfyui runtime package to latest release wheel.
+
 - dynamic-comfyui help
   Show this help menu.
 """
@@ -110,6 +94,7 @@ def build_parser() -> argparse.ArgumentParser:
         "replace-project",
         "update-nodes-and-models",
         "restart",
+        "update-dc",
         "help",
     ):
         subparsers.add_parser(cmd)
@@ -126,7 +111,7 @@ def main() -> None:
 
     if args.command == "install":
         if os.environ.get(REEXEC_FLAG) != "1":
-            code = _upgrade_runtime_package_and_reexec()
+            code = upgrade_runtime_package_and_reexec_install()
             raise SystemExit(code)
         cmd_install(_context())
         raise SystemExit(0)
@@ -139,6 +124,7 @@ def main() -> None:
         "replace-project": cmd_replace_project,
         "update-nodes-and-models": cmd_update_nodes_and_models,
         "restart": cmd_restart,
+        "update-dc": cmd_update_dc,
     }
 
     try:

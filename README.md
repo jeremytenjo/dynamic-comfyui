@@ -25,6 +25,9 @@ Define your files and custom nodes in templates for easy ComfyUI environment set
 - `dc restart`
   Restart ComfyUI service.
 
+- `dc update-dc`
+  Update the `dynamic-comfyui-runtime` package to the latest GitHub Release wheel.
+
 - `dc help`
   Show the command help menu.
 
@@ -84,6 +87,7 @@ What this script does:
 
 - New pods pull the latest runtime wheel during `dc install`.
 - Existing running pods get the new runtime on next pod start cycle (when `dc install` runs again).
+- You can also force a manual runtime package update in a running pod with `dc update-dc`.
 - If GitHub is unreachable or install fails, startup continues with the currently installed Python runtime package.
 
 ## Project File Format

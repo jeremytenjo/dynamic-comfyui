@@ -40,6 +40,7 @@ from .service import (
     stop_comfyui_service,
     verify_comfyui_core_workspace,
 )
+from .updater import upgrade_runtime_package
 
 
 @dataclass
@@ -74,6 +75,8 @@ Run this command in the terminal to replace current project resources with a new
 Run this command in the terminal to restart ComfyUI `dynamic-comfyui restart`
 
 Run this command in the terminal to update nodes and files (uses the last saved JSON URL) `dynamic-comfyui update-nodes-and-models`
+
+Run this command in the terminal to update the dynamic-comfyui runtime package to latest `dynamic-comfyui update-dc`
 
 Run this command in the terminal to list available commands `dynamic-comfyui help`
 """
@@ -322,3 +325,8 @@ def cmd_restart(ctx: RuntimeContext) -> None:
     stop_comfyui_service(comfyui_dir)
     start_comfyui_service(comfyui_dir, network_volume)
     print("ComfyUI restart complete.")
+
+
+def cmd_update_dc(_ctx: RuntimeContext) -> None:
+    if not upgrade_runtime_package():
+        raise RuntimeError("Runtime package update failed")
