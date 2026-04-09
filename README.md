@@ -4,7 +4,9 @@ Define project manifests (custom nodes + files) for repeatable ComfyUI setup on 
 
 ## Quick Start
 
-Run `dc start` in the Jupyter terminal.
+1. Start project with the (Dynamic ComfyUI)[https://console.runpod.io/deploy?template=8b30tcbyze] Runpod template.
+
+2. Run `dc start` in the Jupyter terminal.
 
 ## Commands
 
