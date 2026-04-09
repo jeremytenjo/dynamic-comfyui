@@ -194,7 +194,7 @@ def start_comfyui_service(comfyui_dir: Path, network_volume: Path, install_start
     _ensure_manager_runtime_ready(comfyui_dir, network_volume)
 
     print("Starting ComfyUI via comfy-cli")
-    launch = run(
+    run(
         [
             "comfy",
             "--workspace",
@@ -210,10 +210,6 @@ def start_comfyui_service(comfyui_dir: Path, network_volume: Path, install_start
         cwd=comfyui_dir,
         quiet=True,
     )
-    for line in ((launch.stdout or "") + "\n" + (launch.stderr or "")).splitlines():
-        msg = line.strip()
-        if msg.startswith("ComfyUI is successfully launched in the background.") or msg.startswith("To see the GUI go to:"):
-            startup_lines.append(msg)
 
     max_wait = 90
     waited = 0
