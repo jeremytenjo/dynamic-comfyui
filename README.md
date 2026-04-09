@@ -81,6 +81,7 @@ What this script does:
   - Stable alias: `dynamic_comfyui_runtime-latest-py3-none-any.whl`
 - Publishes assets to GitHub Release tag: `runtime-v<version>`.
   - Creates the release if it does not exist.
+  - Writes release notes with a commit summary from the previous runtime tag to current `HEAD`.
   - Uploads with overwrite if it already exists.
 
 ### Runtime update behavior in pods

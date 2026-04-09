@@ -15,6 +15,7 @@ if ! gh auth status >/dev/null 2>&1; then
 fi
 
 cd "$REPO_ROOT"
+git fetch --tags --force >/dev/null 2>&1 || true
 
 RUNTIME_VERSION="$(python3 - <<'PY'
 from pathlib import Path
@@ -32,6 +33,36 @@ if [ -z "$RUNTIME_VERSION" ]; then
 fi
 
 TAG="runtime-v${RUNTIME_VERSION}"
+PREVIOUS_TAG="$(git tag --list 'runtime-v*' --sort=-v:refname | grep -Fxv "$TAG" | head -n 1 || true)"
+REPO_FULL_NAME="$(gh repo view --json nameWithOwner -q .nameWithOwner)"
+
+build_release_notes() {
+    local notes_file="$1"
+    local range=""
+    local changelog_line=""
+
+    if [ -n "$PREVIOUS_TAG" ]; then
+        range="${PREVIOUS_TAG}..HEAD"
+        changelog_line="Full Changelog: https://github.com/${REPO_FULL_NAME}/compare/${PREVIOUS_TAG}...${TAG}"
+    else
+        range="HEAD"
+        changelog_line="Full Changelog: Initial runtime release"
+    fi
+
+    {
+        echo "## Summary"
+        echo
+        local commits
+        commits="$(git log --no-merges --pretty='- %s (%h)' "$range")"
+        if [ -n "$commits" ]; then
+            echo "$commits"
+        else
+            echo "- No commit messages found for this runtime release."
+        fi
+        echo
+        echo "$changelog_line"
+    } >"$notes_file"
+}
 
 echo "Building runtime wheel for version: $RUNTIME_VERSION"
 python3 -m pip install --upgrade pip build
@@ -42,12 +73,18 @@ WHEEL_PATH="$(ls -1 dist/dynamic_comfyui_runtime-*.whl | head -n 1)"
 LATEST_ALIAS_PATH="dist/dynamic_comfyui_runtime-latest-py3-none-any.whl"
 cp "$WHEEL_PATH" "$LATEST_ALIAS_PATH"
 
+RELEASE_NOTES_FILE="$(mktemp -t dynamic-comfyui-release-notes.XXXXXX.md)"
+build_release_notes "$RELEASE_NOTES_FILE"
+
 if gh release view "$TAG" >/dev/null 2>&1; then
-    echo "Release $TAG exists. Uploading assets with overwrite..."
+    echo "Release $TAG exists. Updating notes and uploading assets with overwrite..."
+    gh release edit "$TAG" --title "$TAG" --notes-file "$RELEASE_NOTES_FILE"
     gh release upload "$TAG" dist/*.whl --clobber
 else
-    echo "Creating release $TAG and uploading assets..."
-    gh release create "$TAG" dist/*.whl --title "$TAG" --generate-notes
+    echo "Creating release $TAG with commit summary notes and uploading assets..."
+    gh release create "$TAG" dist/*.whl --title "$TAG" --notes-file "$RELEASE_NOTES_FILE"
 fi
+
+rm -f "$RELEASE_NOTES_FILE"
 
 echo "Runtime package release published: $TAG"
