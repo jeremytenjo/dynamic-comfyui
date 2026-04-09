@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ComfyUI Setup Required</title>
+  <style>
+    body { margin: 0; font-family: ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; display: grid; place-items: center; padding: 24px; box-sizing: border-box; }
+    .card { width: min(760px, 100%); background: #111827; border: 1px solid #334155; border-radius: 14px; padding: 24px; }
+    h1 { margin: 0 0 10px; font-size: 28px; }
+    p { margin: 0 0 14px; line-height: 1.5; }
+    ol { margin: 10px 0 14px 20px; line-height: 1.6; }
+    code { display: inline-block; background: #020617; border: 1px solid #334155; border-radius: 8px; padding: 8px 10px; font-size: 14px; color: #bfdbfe; }
+    .progress { margin-top: 18px; padding-top: 16px; border-top: 1px solid #334155; }
+    .status, .summary, .message { font-size: 13px; color: #cbd5e1; }
+    .groups { display: grid; gap: 14px; }
+    .group h3 { margin: 0 0 8px; font-size: 14px; color: #93c5fd; }
+    .checklist { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; max-height: 260px; overflow: auto; }
+    .checklist li { display: flex; align-items: center; gap: 10px; font-size: 14px; color: #cbd5e1; background: #0b1328; border: 1px solid #1f2a44; border-radius: 8px; padding: 8px 10px; }
+    .target { word-break: break-word; flex: 1; }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <h1>ComfyUI is not installed yet</h1>
+    <p>Finish one-time setup from Jupyter, then this port will switch to ComfyUI automatically.</p>
+    <ol>
+      <li>Open Jupyter Lab (port 8888).</li>
+      <li>Open a terminal in Jupyter.</li>
+      <li>Run <code>dynamic-comfyui start</code></li>
+    </ol>
+    <p>The installer downloads files and custom nodes, then starts ComfyUI on port 8188.</p>
+    <section class="progress">
+      <h2>Download checklist</h2>
+      <p id="progress-status" class="status">Status: Pending</p>
+      <p id="progress-summary" class="summary">0/0 complete • 0 left</p>
+      <p id="progress-message" class="message"></p>
+      <div id="progress-groups" class="groups"></div>
+    </section>
+  </main>
+  <script>
+    function humanStatus(raw) {
+      const map = { idle: "Pending", running: "Running", done: "Done", failed: "Failed" };
+      return map[raw] || "Pending";
+    }
+
+    function updateSummary(items) {
+      const total = items.length;
+      const checked = items.filter((item) => item.checked).length;
+      const left = Math.max(total - checked, 0);
+      const el = document.getElementById("progress-summary");
+      if (el) el.textContent = `${checked}/${total} complete • ${left} left`;
+    }
+
+    function renderGroup(groupKey, groupData) {
+      const section = document.createElement("section");
+      section.className = "group";
+      const title = document.createElement("h3");
+      title.textContent = groupData.label || groupKey;
+      section.appendChild(title);
+
+      const list = document.createElement("ul");
+      list.className = "checklist";
+      const items = Array.isArray(groupData.items) ? groupData.items : [];
+      for (const item of items) {
+        const li = document.createElement("li");
+        const box = document.createElement("input");
+        box.type = "checkbox";
+        box.disabled = true;
+        box.checked = !!item.checked;
+        const target = document.createElement("span");
+        target.className = "target";
+        target.textContent = item.target || "(unknown target)";
+        li.appendChild(box);
+        li.appendChild(target);
+        list.appendChild(li);
+      }
+      section.appendChild(list);
+      return { section, items };
+    }
+
+    function renderProgress(payload) {
+      const statusEl = document.getElementById("progress-status");
+      const messageEl = document.getElementById("progress-message");
+      const groupsEl = document.getElementById("progress-groups");
+      if (statusEl) statusEl.textContent = `Status: ${humanStatus(payload.status)}`;
+      if (messageEl) messageEl.textContent = payload.message || "";
+      if (!groupsEl) return;
+
+      groupsEl.innerHTML = "";
+      let allItems = [];
+      const groups = payload.groups || {};
+      for (const [key, value] of Object.entries(groups)) {
+        const rendered = renderGroup(key, value || {});
+        groupsEl.appendChild(rendered.section);
+        allItems = allItems.concat(rendered.items);
+      }
+      updateSummary(allItems);
+    }
+
+    async function refreshProgress() {
+      try {
+        const res = await fetch("/progress.json", { cache: "no-store" });
+        if (!res.ok) return;
+        const payload = await res.json();
+        renderProgress(payload);
+      } catch (err) {
+      }
+    }
+
+    setInterval(refreshProgress, 1500);
+    refreshProgress();
+  </script>
+</body>
+</html>

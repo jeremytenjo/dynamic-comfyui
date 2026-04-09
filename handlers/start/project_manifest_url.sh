@@ -130,7 +130,7 @@ refresh_project_manifest_from_saved_url() {
     local saved_source_url=""
 
     if [ ! -f "$state_path" ]; then
-        echo "❌ No saved project selection found. Run 'bash start.sh' first."
+        echo "❌ No saved project selection found. Run 'dynamic-comfyui start' first."
         return 1
     fi
 
@@ -147,7 +147,7 @@ refresh_project_manifest_from_saved_url() {
     else
         saved_source_url="$(normalize_project_manifest_url "$saved_source_url")"
         if ! validate_project_manifest_url "$saved_source_url"; then
-            echo "❌ Saved project URL is invalid. Run 'bash start.sh' and enter a valid JSON URL."
+            echo "❌ Saved project URL is invalid. Run 'dynamic-comfyui start' and enter a valid JSON URL."
             return 1
         fi
 

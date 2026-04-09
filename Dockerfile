@@ -52,21 +52,15 @@ RUN set -eux; \
         python3 -m pip install --no-cache-dir -r /ComfyUI/requirements.txt; \
     fi
 
-COPY start.sh /start.sh
-COPY start-new-project.sh /start-new-project.sh
-COPY add-project.sh /add-project.sh
-COPY replace-project.sh /replace-project.sh
-COPY install.sh /install.sh
-COPY update-nodes-and-models.sh /update-nodes-and-models.sh
-COPY restart.sh /restart.sh
-COPY help.sh /help.sh
 COPY package.json /package.json
+COPY pyproject.toml /pyproject.toml
+COPY README.md /README.md
+COPY src /src
 COPY default-resources.json /default-resources.json
 COPY projects /projects
-COPY handlers /handlers
 
-RUN chmod +x /start.sh /start-new-project.sh /add-project.sh /replace-project.sh /install.sh /update-nodes-and-models.sh /restart.sh /help.sh
+RUN python3 -m pip install --no-cache-dir /
 
 EXPOSE 8188 8888
 
-CMD ["/install.sh"]
+CMD ["dynamic-comfyui", "install"]

@@ -9,7 +9,7 @@ fetch_project_manifest() {
     local manifest_tmp_dir
 
     if [ -z "${INSTALL_MANIFEST_PATH:-}" ]; then
-        echo "❌ INSTALL_MANIFEST_PATH is not set. Select a project with 'bash start.sh' or load a saved one first."
+        echo "❌ INSTALL_MANIFEST_PATH is not set. Select a project with 'dynamic-comfyui start' or load a saved one first."
         return 1
     fi
 

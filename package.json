@@ -1,6 +1,7 @@
 {
   "default_resources_url": "https://github.com/jeremytenjo/dynamic-comfyui/blob/main/default-resources.json",
   "scripts": {
-    "setup-page-preview": "bash handlers/start/run_local_setup_page_preview.sh 8189"
+    "setup-page-preview": "python3 -m http.server 8189 --directory src/dynamic_comfyui_runtime/templates",
+    "release-runtime-package": "bash scripts/release-runtime-package.sh"
   }
 }

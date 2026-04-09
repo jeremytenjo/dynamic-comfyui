@@ -186,7 +186,7 @@ serve_setup_instructions_page() {
     <ol>
       <li>Open <a id="jupyter-link" class="inline-link" href="#" target="_blank" rel="noopener noreferrer">Jupyter Lab (port 8888)</a>.</li>
       <li>Open a terminal in Jupyter.</li>
-      <li>Run <code>bash start.sh</code></li>
+      <li>Run <code>dynamic-comfyui start</code></li>
     </ol>
     <p>The installer downloads files and custom nodes, then starts ComfyUI on port 8188.</p>
     <p class="hint">You can keep this tab open. It will switch to ComfyUI automatically when ready.</p>

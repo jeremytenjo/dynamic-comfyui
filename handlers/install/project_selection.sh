@@ -85,7 +85,7 @@ try_load_saved_project_manifest() {
 
 set_install_manifest_from_saved_project() {
     if ! load_saved_project_manifest; then
-        echo "❌ No saved project selection found. Run 'bash start.sh' or 'bash start-new-project.sh' first."
+        echo "❌ No saved project selection found. Run 'dynamic-comfyui start' or 'dynamic-comfyui start-new-project' first."
         return 1
     fi
 

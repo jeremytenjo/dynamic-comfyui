@@ -17,19 +17,19 @@ Save your character lora in the /ComfyUI/models/lora folder.
 
 Usage: 
 
-Run this command in the terminal to start ComfyUI. First step: enter your direct JSON URL `bash start.sh`
+Run this command in the terminal to start ComfyUI. First step: enter your direct JSON URL `dynamic-comfyui start`
 
-Run this command in the terminal to switch projects. First step: enter your direct JSON URL `bash start-new-project.sh`
+Run this command in the terminal to switch projects. First step: enter your direct JSON URL `dynamic-comfyui start-new-project`
 
-Run this command in the terminal to add another project manifest without removing existing resources `bash add-project.sh`
+Run this command in the terminal to add another project manifest without removing existing resources `dynamic-comfyui add-project`
 
-Run this command in the terminal to replace current project resources with a new project manifest `bash replace-project.sh`
+Run this command in the terminal to replace current project resources with a new project manifest `dynamic-comfyui replace-project`
 
-Run this command in the terminal to restart ComfyUI `bash restart.sh`
+Run this command in the terminal to restart ComfyUI `dynamic-comfyui restart`
 
-Run this command in the terminal to update nodes and files (uses the last saved JSON URL) `bash update-nodes-and-models.sh`
+Run this command in the terminal to update nodes and files (uses the last saved JSON URL) `dynamic-comfyui update-nodes-and-models`
 
-Run this command in the terminal to list available commands `bash help.sh`
+Run this command in the terminal to list available commands `dynamic-comfyui help`
 
 EOF
 }
