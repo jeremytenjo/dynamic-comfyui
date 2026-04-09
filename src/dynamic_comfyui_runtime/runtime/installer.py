@@ -13,14 +13,17 @@ def install_custom_nodes(custom_nodes: list[CustomNode], custom_nodes_dir: Path,
         return
 
     for idx, node in enumerate(custom_nodes, start=1):
-        print(f"[{idx}/{len(custom_nodes)}] Installing git node {node.repo_dir}")
+        print(f"[{idx}/{len(custom_nodes)}] Ensuring git node {node.repo_dir}")
         node_path = custom_nodes_dir / node.repo_dir
-        if (node_path / ".git").is_dir():
-            run(["git", "-C", str(node_path), "pull", "--ff-only"])
-        else:
-            if node_path.exists():
-                shutil.rmtree(node_path)
-            run(["git", "clone", node.repo, str(node_path)])
+        if node_path.is_dir():
+            print(f"Custom node already installed, skipping: {node.repo_dir}")
+            if on_progress:
+                on_progress()
+            continue
+
+        if node_path.exists():
+            shutil.rmtree(node_path)
+        run(["git", "clone", node.repo, str(node_path)])
 
         requirements = node_path / "requirements.txt"
         if requirements.is_file():
