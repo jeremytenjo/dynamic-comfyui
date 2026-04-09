@@ -186,7 +186,8 @@ def run_comfyui_install_flow(ctx: RuntimeContext, project_manifest_path: Path) -
 
     mark_done(merged, comfyui_dir)
     _print_resource_summary(merged, custom_nodes_dir, comfyui_dir)
-    print("✅ Installation complete and ComfyUI is ready on port 8188.")
+    print("✅ Installation complete")
+    print("🚀 ComfyUI is running on port 8188")
 
 
 def cmd_install(ctx: RuntimeContext) -> None:
