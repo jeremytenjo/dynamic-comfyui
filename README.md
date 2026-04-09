@@ -95,6 +95,48 @@ What this script does:
 - You can also force a manual runtime package update in a running pod with `dc update-dc`.
 - If GitHub is unreachable or install fails, startup continues with the currently installed Python runtime package.
 
+### Debug Runtime In Jupyter Pod (No Docker Rebuild)
+
+Use this workflow for runtime Python changes (`src/dynamic_comfyui_runtime/**`, CLI/runtime behavior, manifests, install flow):
+
+1. Edit and test code locally in this repo.
+2. Publish a new runtime wheel:
+   `npm run deploy:patch` (or `deploy:minor` / `deploy:major`).
+3. In the pod, open a Jupyter terminal and update runtime:
+   `dc update-dc`
+4. Re-run the flow you are testing, for example:
+   - `dc start`
+   - `dc update-nodes-and-models`
+   - `dc restart`
+5. Iterate: make another code patch, publish again, run `dc update-dc` again in the same pod.
+
+If the pod is on an older build where `dc update-dc` fails with an invalid wheel filename (`...-latest-py3-none-any.whl`), run this one-time bootstrap update:
+
+```bash
+WHEEL_URL="$(python3 - <<'PY'
+import json, re, urllib.request
+api = "https://api.github.com/repos/jeremytenjo/dynamic-comfyui/releases/latest"
+req = urllib.request.Request(api, headers={"Accept":"application/vnd.github+json","User-Agent":"dc-bootstrap-updater"})
+data = json.loads(urllib.request.urlopen(req, timeout=20).read().decode())
+for a in data.get("assets", []):
+    name = a.get("name", "")
+    if re.match(r"^dynamic_comfyui_runtime-.+-py3-none-any\.whl$", name) and "-latest-" not in name:
+        print(a["browser_download_url"])
+        break
+else:
+    raise SystemExit("No versioned wheel found in latest release assets")
+PY
+)"
+python3 -m pip install --no-cache-dir --upgrade "$WHEEL_URL"
+```
+
+After that bootstrap, `dc update-dc` will work for future updates.
+
+### When Docker Rebuild Is Required
+
+- Do **not** rebuild/publish Docker images for normal runtime Python changes.
+- Rebuild/publish Docker images only when changing ComfyUI core/image-level dependencies (base image, system packages, Python runtime in image, or pinned ComfyUI core itself).
+
 ## Project File Format
 
 Example (`<URL>.json`):
