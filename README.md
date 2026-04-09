@@ -4,7 +4,7 @@ Define project manifests (custom nodes + files) for repeatable ComfyUI setup on 
 
 ## Quick Start
 
-Run `dc start` and follow the prompt for your project JSON URL.
+Run `dc start` in the Jupyter terminal.
 
 ## Commands
 
@@ -63,6 +63,7 @@ Release steps:
    `npm run deploy:patch` (or `deploy:minor` / `deploy:major`)
 
 What `deploy:*` does:
+
 - Requires a clean git tree.
 - Bumps version in `pyproject.toml`, commits, and pushes.
 - Builds wheel assets and publishes to release tag `runtime-v<version>`.
