@@ -43,7 +43,7 @@ Define your files and custom nodes in templates for easy ComfyUI environment set
 On every container start, `dc install` does:
 
 1. `pip install --upgrade` from:
-   `https://github.com/jeremytenjo/dc/releases/latest/download/dynamic_comfyui_runtime-latest-py3-none-any.whl`
+   `https://github.com/jeremytenjo/dynamic-comfyui/releases/latest/download/dynamic_comfyui_runtime-latest-py3-none-any.whl`
 2. Re-executes `dc install` from the updated package.
 3. Runs the install/startup flow through Python runtime modules (no shell handler sourcing).
 4. If package update fails, continues using the already-installed package version.
@@ -62,7 +62,7 @@ Release flow:
 
 1. Bump `[project].version` in `pyproject.toml`.
 2. Run:
-   `npm run release-runtime-package`
+   `npm run deploy:patch` (or `deploy:minor` / `deploy:major`)
 
 What this script does:
 

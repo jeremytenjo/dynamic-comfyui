@@ -21,6 +21,11 @@ esac
 
 cd "$REPO_ROOT"
 
+if [ -n "$(git status --porcelain)" ]; then
+  echo "Working tree is not clean. Commit or stash changes before deploy."
+  exit 1
+fi
+
 VERSION_LINE="$(grep -E '^version = "[0-9]+\.[0-9]+\.[0-9]+"$' pyproject.toml | head -n 1 || true)"
 if [ -z "$VERSION_LINE" ]; then
   echo "Could not find semantic version in pyproject.toml"
@@ -71,5 +76,20 @@ if count != 1:
     raise SystemExit("Failed to update version in pyproject.toml")
 path.write_text(updated, encoding="utf-8")
 PY
+
+if [ -z "$(git status --porcelain pyproject.toml)" ]; then
+  echo "No version change detected in pyproject.toml"
+  exit 1
+fi
+
+CURRENT_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+if [ "$CURRENT_BRANCH" = "HEAD" ]; then
+  echo "Detached HEAD detected. Switch to a branch before deploy."
+  exit 1
+fi
+
+git add pyproject.toml
+git commit -m "chore(runtime): bump version to ${NEXT_VERSION}"
+git push origin "$CURRENT_BRANCH"
 
 bash scripts/release-runtime-package.sh

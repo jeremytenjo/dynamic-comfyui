@@ -37,6 +37,7 @@ package-lock.json
 # Python (if any)
 __pycache__/
 *.pyc
+dist/
 build/
 *.egg-info/
 .eggs/
