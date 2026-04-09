@@ -49,11 +49,11 @@ run `dc start` and follow the prompts.
 
 On every container start, `dc install` does:
 
-1. `pip install --upgrade` from:
-   `https://github.com/jeremytenjo/dynamic-comfyui/releases/latest/download/dynamic_comfyui_runtime-latest-py3-none-any.whl`
-2. Re-executes `dc install` from the updated package.
-3. Runs the install/startup flow through Python runtime modules (no shell handler sourcing).
-4. If package update fails, continues using the already-installed package version.
+1. Resolves the latest runtime release from GitHub Releases API and selects the versioned wheel asset.
+2. Runs `pip install --upgrade` using that versioned wheel URL.
+3. Re-executes `dc install` from the updated package.
+4. Runs the install/startup flow through Python runtime modules (no shell handler sourcing).
+5. If package update fails, continues using the already-installed package version.
 
 This keeps one Python command surface while allowing runtime updates without rebuilding the Docker image.
 
