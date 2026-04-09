@@ -37,6 +37,17 @@ package-lock.json
 # Python (if any)
 __pycache__/
 *.pyc
+build/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
 
 # System folders (copied from container — DO NOT VERSION)
 bin/
