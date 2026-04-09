@@ -152,10 +152,10 @@ def _load_manifest_context(ctx: RuntimeContext, project_manifest_path: Path) -> 
 
 
 def _print_resource_summary(merged: MergedManifest, custom_nodes_dir: Path, comfyui_dir: Path) -> None:
-    print_custom_nodes_summary("Installed custom nodes (default resources):", merged.default_custom_nodes, custom_nodes_dir)
-    print_custom_nodes_summary("Installed custom nodes (project manifest):", merged.project_custom_nodes, custom_nodes_dir)
-    print_files_summary("Installed files (default resources):", merged.default_files, comfyui_dir)
-    print_files_summary("Installed files (project manifest):", merged.project_files, comfyui_dir)
+    print_custom_nodes_summary("✅ Installed custom nodes (default resources):", merged.default_custom_nodes, custom_nodes_dir)
+    print_custom_nodes_summary("✅ Installed custom nodes (project manifest):", merged.project_custom_nodes, custom_nodes_dir)
+    print_files_summary("✅ Installed files (default resources):", merged.default_files, comfyui_dir)
+    print_files_summary("✅ Installed files (project manifest):", merged.project_files, comfyui_dir)
 
 
 def run_comfyui_install_flow(ctx: RuntimeContext, project_manifest_path: Path) -> None:
