@@ -12,12 +12,22 @@ from pathlib import Path
 from typing import Iterable
 
 
-def run(cmd: list[str], *, cwd: Path | None = None, check: bool = True, quiet: bool = False) -> subprocess.CompletedProcess[str]:
+def run(
+    cmd: list[str],
+    *,
+    cwd: Path | None = None,
+    check: bool = True,
+    quiet: bool = False,
+    timeout: int | None = None,
+) -> subprocess.CompletedProcess[str]:
     kwargs: dict[str, object] = {"cwd": str(cwd) if cwd else None, "text": True}
     if quiet:
         kwargs["stdout"] = subprocess.PIPE
         kwargs["stderr"] = subprocess.PIPE
-    completed = subprocess.run(cmd, **kwargs)  # noqa: S603
+    try:
+        completed = subprocess.run(cmd, timeout=timeout, **kwargs)  # noqa: S603
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(f"Command timed out after {timeout}s: {' '.join(cmd)}") from exc
     if check and completed.returncode != 0:
         raise RuntimeError(f"Command failed ({completed.returncode}): {' '.join(cmd)}")
     return completed

@@ -75,7 +75,11 @@ def ensure_comfy_cli_ready(network_volume: Path) -> None:
         _install_comfy_cli(network_volume)
     if not command_exists("comfy"):
         raise RuntimeError("comfy-cli installation completed but 'comfy' command is not available")
-    run(["comfy", "tracking", "disable"], check=False, quiet=True)
+    # This command is best-effort; do not block runtime setup on telemetry config.
+    try:
+        run(["comfy", "tracking", "disable"], check=False, quiet=True, timeout=20)
+    except Exception as exc:
+        print(f"Warning: comfy tracking disable skipped: {exc}")
 
 
 def verify_comfyui_core_workspace(comfyui_dir: Path) -> None:
