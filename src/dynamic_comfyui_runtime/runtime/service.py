@@ -226,7 +226,7 @@ def start_comfyui_service(comfyui_dir: Path, network_volume: Path, install_start
                 gui_url = runpod_url
             else:
                 gui_url = "http://127.0.0.1:8188"
-            startup_lines.append(f"ComfyUI running: {gui_url} ({startup_time})")
+            startup_lines.append(f"✅ ComfyUI running: {gui_url} ({startup_time})")
             return startup_lines
         print("ComfyUI starting...")
         time.sleep(2)
