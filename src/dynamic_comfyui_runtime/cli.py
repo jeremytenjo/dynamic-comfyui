@@ -13,6 +13,7 @@ from .runtime.operations import (
     cmd_restart,
     cmd_start,
     cmd_start_new_project,
+    cmd_uninstall_dc,
     cmd_update_dc,
     cmd_update_nodes_and_models,
 )
@@ -81,6 +82,9 @@ def _help_text() -> str:
 - dc update-dc
   Update dynamic-comfyui runtime package to latest release wheel.
 
+- dc uninstall-dc
+  Uninstall dynamic-comfyui runtime package from the current Python environment.
+
 - dc help
   Show this help menu.
 """
@@ -99,6 +103,7 @@ def build_parser() -> argparse.ArgumentParser:
         "update-nodes-and-models",
         "restart",
         "update-dc",
+        "uninstall-dc",
         "help",
     ):
         subparsers.add_parser(cmd)
@@ -133,6 +138,7 @@ def main() -> None:
         "update-nodes-and-models": cmd_update_nodes_and_models,
         "restart": cmd_restart,
         "update-dc": cmd_update_dc,
+        "uninstall-dc": cmd_uninstall_dc,
     }
 
     try:

@@ -43,7 +43,7 @@ from .service import (
     stop_comfyui_service,
     verify_comfyui_core_workspace,
 )
-from .updater import upgrade_runtime_package
+from .updater import uninstall_runtime_package, upgrade_runtime_package
 
 
 @dataclass
@@ -92,6 +92,8 @@ Run this command in the terminal to update nodes and files (uses the last saved 
 Run this command in the terminal to install custom nodes/files only `dynamic-comfyui install-deps <project-json-url>`
 
 Run this command in the terminal to update the dynamic-comfyui runtime package to latest `dynamic-comfyui update-dc`
+
+Run this command in the terminal to uninstall the dynamic-comfyui runtime package `dynamic-comfyui uninstall-dc`
 
 Run this command in the terminal to list available commands `dynamic-comfyui help`
 """
@@ -444,3 +446,8 @@ def cmd_restart(ctx: RuntimeContext) -> None:
 def cmd_update_dc(_ctx: RuntimeContext) -> None:
     if not upgrade_runtime_package():
         raise RuntimeError("Runtime package update failed")
+
+
+def cmd_uninstall_dc(_ctx: RuntimeContext) -> None:
+    if not uninstall_runtime_package():
+        raise RuntimeError("Runtime package uninstall failed")

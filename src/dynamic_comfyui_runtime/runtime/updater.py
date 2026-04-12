@@ -53,6 +53,16 @@ def upgrade_runtime_package() -> bool:
     return True
 
 
+def uninstall_runtime_package() -> bool:
+    print("Uninstalling dynamic-comfyui runtime package...")
+    uninstall = subprocess.run([sys.executable, "-m", "pip", "uninstall", "-y", "dynamic-comfyui-runtime"])
+    if uninstall.returncode != 0:
+        print("Warning: failed to uninstall dynamic-comfyui-runtime package.")
+        return False
+    print("Runtime package uninstall complete.")
+    return True
+
+
 def upgrade_runtime_package_and_reexec_install() -> int:
     if os.environ.get(REEXEC_FLAG) == "1":
         return 0

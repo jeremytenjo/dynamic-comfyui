@@ -41,6 +41,9 @@ Define project manifests (custom nodes + files) for repeatable ComfyUI setup on 
 - `dc update-dc`
   Update the `dynamic-comfyui-runtime` package to the latest GitHub Release wheel.
 
+- `dc uninstall-dc`
+  Uninstall the `dynamic-comfyui-runtime` package from the current Python environment.
+
 - `dc help`
   Show the command help menu.
 
