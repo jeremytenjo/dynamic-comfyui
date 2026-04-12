@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import shutil
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -87,21 +88,40 @@ def install_files(
         print("No files defined in install manifest; skipping file installation.")
         return []
 
-    failures: list[FileInstallFailure] = []
-    for idx, file_spec in enumerate(files, start=1):
+    def _process_file(file_spec: FileSpec) -> FileInstallFailure | None:
         target_path = comfyui_dir / file_spec.target
-        print(f"[{idx}/{len(files)}] Processing {file_spec.target}")
         if target_path.is_file():
-            print(f"File already exists, skipping: {file_spec.target}")
-        else:
-            try:
-                download_file(file_spec.url, target_path, hf_token=hf_token)
-            except Exception as exc:
-                failures.append(FileInstallFailure(target=file_spec.target, error=str(exc)))
-                print(f"❌ Failed to download {file_spec.target}: {exc}")
-        if on_progress:
-            on_progress()
+            return None
+        try:
+            download_file(file_spec.url, target_path, hf_token=hf_token)
+        except Exception as exc:
+            return FileInstallFailure(target=file_spec.target, error=str(exc))
+        return None
 
+    failures: list[FileInstallFailure] = []
+    futures = {}
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        for idx, file_spec in enumerate(files, start=1):
+            target_path = comfyui_dir / file_spec.target
+            print(f"[{idx}/{len(files)}] Processing {file_spec.target}")
+            if target_path.is_file():
+                print(f"File already exists, skipping: {file_spec.target}")
+                if on_progress:
+                    on_progress()
+                continue
+            futures[executor.submit(_process_file, file_spec)] = file_spec
+
+        for future in as_completed(futures):
+            file_spec = futures[future]
+            failure = future.result()
+            if failure is not None:
+                failures.append(failure)
+                print(f"❌ Failed to download {file_spec.target}: {failure.error}")
+            if on_progress:
+                on_progress()
+
+    # Keep deterministic failure ordering for summaries.
+    failures.sort(key=lambda item: item.target)
     return failures
 
 
