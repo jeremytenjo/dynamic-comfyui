@@ -6,6 +6,11 @@ from pathlib import Path
 from .common import download_file, ensure_dir, find_file_upwards, normalize_github_blob_url, read_json
 
 
+DEFAULT_RESOURCES_URL = normalize_github_blob_url(
+    "https://github.com/jeremytenjo/dynamic-comfyui/blob/main/default-resources.json"
+)
+
+
 @dataclass(frozen=True)
 class CustomNode:
     repo_dir: str
@@ -44,13 +49,10 @@ def project_state_path(network_volume: Path) -> Path:
 
 
 def default_resources_url_from_package_json(package_json_path: Path) -> str:
-    if not package_json_path.is_file():
-        return ""
-    data = read_json(package_json_path)
-    value = data.get("default_resources_url", "")
-    if not isinstance(value, str):
-        raise ValueError("package.json field 'default_resources_url' must be a string")
-    return normalize_github_blob_url(value.strip())
+    # Defaults are intentionally pinned to a canonical remote manifest URL so
+    # pip-installed runtime wheels behave the same even when package.json is absent.
+    _ = package_json_path
+    return DEFAULT_RESOURCES_URL
 
 
 def _local_default_manifest_path(package_json_path: Path) -> Path | None:

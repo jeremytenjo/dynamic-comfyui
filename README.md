@@ -149,11 +149,11 @@ When `require_huggingface_token` is `true`:
 
 ## Default Resources (All Projects)
 
-Global default resources are fetched from the URL configured in:
+Global default resources are always fetched from:
 
-- `package.json` (`default_resources_url`)
+- `https://github.com/jeremytenjo/dynamic-comfyui/blob/main/default-resources.json`
 
-This lets you update defaults without rebuilding the image: edit the hosted JSON file at that URL.
+This URL is pinned in runtime code so pip-installed builds and source checkouts behave the same.
 
 If the remote default manifest fails to download, the runtime falls back to local `default-resources.json` in this order: same directory as `package.json`, nearest parent directory from current working directory, then `/default-resources.json`. If none is available, install continues with project resources only (defaults skipped for that run, with a warning).
 
