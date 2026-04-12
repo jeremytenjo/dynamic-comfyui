@@ -253,7 +253,7 @@ def run_dependency_install_flow(ctx: RuntimeContext, project_manifest_path: Path
 
     mark_done(merged, comfyui_dir)
     _print_resource_summary(merged, custom_nodes_dir, comfyui_dir, node_failures, file_failures)
-    print("Dependency installation complete. ComfyUI was not started.")
+    print("Dependency installation complete.")
 
 
 def cmd_install(ctx: RuntimeContext) -> None:
