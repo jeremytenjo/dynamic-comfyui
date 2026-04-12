@@ -44,6 +44,15 @@ def ensure_dir(path: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
 
 
+def find_file_upwards(filename: str, start_dir: Path | None = None) -> Path | None:
+    current = (start_dir or Path.cwd()).resolve()
+    for directory in (current, *current.parents):
+        candidate = directory / filename
+        if candidate.is_file():
+            return candidate
+    return None
+
+
 def read_json(path: Path) -> dict:
     data = json.loads(path.read_text(encoding="utf-8"))
     if data is None:

@@ -155,7 +155,7 @@ Global default resources are fetched from the URL configured in:
 
 This lets you update defaults without rebuilding the image: edit the hosted JSON file at that URL.
 
-If the remote default manifest fails to download, the runtime falls back to local `default-resources.json` (same directory as `package.json`, then `/default-resources.json`). If neither is available, install continues with project resources only (defaults skipped for that run, with a warning).
+If the remote default manifest fails to download, the runtime falls back to local `default-resources.json` in this order: same directory as `package.json`, nearest parent directory from current working directory, then `/default-resources.json`. If none is available, install continues with project resources only (defaults skipped for that run, with a warning).
 
 Default resources use the same schema as the project manifest format above.
 

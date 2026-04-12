@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from .common import download_file, ensure_dir, normalize_github_blob_url, read_json
+from .common import download_file, ensure_dir, find_file_upwards, normalize_github_blob_url, read_json
 
 
 @dataclass(frozen=True)
@@ -54,10 +54,16 @@ def default_resources_url_from_package_json(package_json_path: Path) -> str:
 
 
 def _local_default_manifest_path(package_json_path: Path) -> Path | None:
-    candidates = [
-        package_json_path.parent / "default-resources.json",
-        Path("/default-resources.json"),
-    ]
+    candidates: list[Path] = []
+    package_candidate = package_json_path.parent / "default-resources.json"
+    if package_candidate not in candidates:
+        candidates.append(package_candidate)
+    cwd_candidate = find_file_upwards("default-resources.json")
+    if cwd_candidate is not None and cwd_candidate not in candidates:
+        candidates.append(cwd_candidate)
+    root_candidate = Path("/default-resources.json")
+    if root_candidate not in candidates:
+        candidates.append(root_candidate)
     for candidate in candidates:
         if candidate.is_file():
             return candidate
