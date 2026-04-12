@@ -19,6 +19,56 @@ from .common import (
 from .progress import stop_setup_page_server
 
 
+def _looks_like_comfyui_workspace(path: Path) -> bool:
+    return (
+        path.is_dir()
+        and (path / ".git").is_dir()
+        and (path / "main.py").is_file()
+        and (path / "custom_nodes").is_dir()
+        and (path / "models").is_dir()
+    )
+
+
+def discover_comfyui_workspace(network_volume: Path) -> Path | None:
+    candidates: list[Path] = []
+
+    # Respect configured/default volume first.
+    candidates.append(network_volume / "ComfyUI")
+    # Common image path.
+    candidates.append(Path("/ComfyUI"))
+
+    cwd = Path.cwd()
+    candidates.append(cwd / "ComfyUI")
+    for parent in cwd.parents:
+        candidates.append(parent / "ComfyUI")
+        if parent.name == "ComfyUI":
+            candidates.append(parent)
+
+    for root in (Path("/workspace"), Path("/runpod-volume"), Path("/data"), Path("/root")):
+        if not root.is_dir():
+            continue
+        candidates.append(root / "ComfyUI")
+        try:
+            for child in root.iterdir():
+                if child.is_dir():
+                    candidates.append(child / "ComfyUI")
+        except Exception:
+            continue
+
+    seen: set[Path] = set()
+    for candidate in candidates:
+        try:
+            resolved = candidate.resolve()
+        except Exception:
+            continue
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        if _looks_like_comfyui_workspace(resolved):
+            return resolved
+    return None
+
+
 def set_network_volume_default(network_volume: Path) -> Path:
     if network_volume.is_dir():
         return network_volume

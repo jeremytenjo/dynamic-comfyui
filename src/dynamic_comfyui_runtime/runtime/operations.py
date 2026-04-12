@@ -31,6 +31,7 @@ from .manifests import (
 from .progress import mark_done, mark_failed, mark_idle, mark_running, start_setup_page_server
 from .service import (
     configure_process_env,
+    discover_comfyui_workspace,
     enable_manager_gui,
     ensure_comfy_cli_ready,
     ensure_comfyui_workspace,
@@ -305,11 +306,21 @@ def cmd_start(ctx: RuntimeContext) -> None:
 def cmd_install_deps(ctx: RuntimeContext, project_url: str | None = None) -> None:
     configure_process_env()
     network_volume = set_network_volume_default(ctx.network_volume)
+    detected_comfyui = discover_comfyui_workspace(network_volume)
+    if detected_comfyui is not None:
+        detected_volume = detected_comfyui.parent
+        if detected_volume != network_volume:
+            print(f"Detected ComfyUI workspace at {detected_comfyui}. Using {detected_volume} as workspace root.")
+        network_volume = detected_volume
+    else:
+        print(f"Could not auto-detect ComfyUI workspace. Using configured workspace root: {network_volume}")
+
     if project_url is not None:
         manifest_path, source_url = prepare_project_manifest(network_volume, project_url)
     else:
         manifest_path, source_url = prompt_and_prepare_project_manifest(network_volume)
     _save_selected_project(network_volume, manifest_path, source_url)
+    ctx.network_volume = network_volume
     try:
         run_dependency_install_flow(ctx, manifest_path)
     except Exception as exc:

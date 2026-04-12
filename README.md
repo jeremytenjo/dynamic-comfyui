@@ -16,6 +16,7 @@ Define project manifests (custom nodes + files) for repeatable ComfyUI setup on 
 - `dc install-deps`
   Install custom nodes/files only.
   Usage: `dc install-deps <project-json-url>` or `dc install-deps` (prompts for URL; Enter = defaults-only).
+  ComfyUI workspace is auto-detected.
   This command does not start Jupyter or ComfyUI.
 
 - `dc start`
