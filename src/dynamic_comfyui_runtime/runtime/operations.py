@@ -78,7 +78,7 @@ Run this command in the terminal to restart ComfyUI `dynamic-comfyui restart`
 
 Run this command in the terminal to update nodes and files (uses the last saved JSON URL) `dynamic-comfyui update-nodes-and-models`
 
-Run this command in the terminal to install custom nodes/files only. First step: enter your direct JSON URL `dynamic-comfyui install-deps`
+Run this command in the terminal to install custom nodes/files only `dynamic-comfyui install-deps <project-json-url>`
 
 Run this command in the terminal to update the dynamic-comfyui runtime package to latest `dynamic-comfyui update-dc`
 
@@ -136,6 +136,14 @@ def prompt_and_prepare_project_manifest(network_volume: Path) -> tuple[Path, str
             return manifest_path, source_url
         except Exception as exc:
             print(f"❌ Failed to download project manifest: {exc}")
+
+
+def prepare_project_manifest(network_volume: Path, source_url: str) -> tuple[Path, str]:
+    manifest_path = active_project_manifest_path(network_volume)
+    normalized = normalize_manifest_url(source_url.strip())
+    validate_manifest_url(normalized)
+    download_manifest(normalized, manifest_path)
+    return manifest_path, normalized
 
 
 def _load_manifest_context(ctx: RuntimeContext, project_manifest_path: Path) -> tuple[MergedManifest, str | None]:
@@ -294,10 +302,13 @@ def cmd_start(ctx: RuntimeContext) -> None:
         raise
 
 
-def cmd_install_deps(ctx: RuntimeContext) -> None:
+def cmd_install_deps(ctx: RuntimeContext, project_url: str | None = None) -> None:
     configure_process_env()
     network_volume = set_network_volume_default(ctx.network_volume)
-    manifest_path, source_url = prompt_and_prepare_project_manifest(network_volume)
+    if project_url is not None:
+        manifest_path, source_url = prepare_project_manifest(network_volume, project_url)
+    else:
+        manifest_path, source_url = prompt_and_prepare_project_manifest(network_volume)
     _save_selected_project(network_volume, manifest_path, source_url)
     try:
         run_dependency_install_flow(ctx, manifest_path)

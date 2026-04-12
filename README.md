@@ -2,15 +2,6 @@
 
 Define project manifests (custom nodes + files) for repeatable ComfyUI setup on RunPod.
 
-## Minimal Setup (Any Pod)
-
-```bash
-python3 -m pip install --no-cache-dir --upgrade \
-  "git+https://github.com/jeremytenjo/dynamic-comfyui.git"
-
-dc install-deps
-```
-
 ## Quick Start
 
 1. Start project with the [Dynamic ComfyUI](https://console.runpod.io/deploy?template=8b30tcbyze) Runpod template.
@@ -23,7 +14,8 @@ dc install-deps
   Start Jupyter + runtime boot flow (container entry command).
 
 - `dc install-deps`
-  Enter a JSON URL (or press Enter for defaults-only), then install custom nodes/files only.
+  Install custom nodes/files only.
+  Usage: `dc install-deps <project-json-url>` or `dc install-deps` (prompts for URL; Enter = defaults-only).
   This command does not start Jupyter or ComfyUI.
 
 - `dc start`
@@ -50,10 +42,6 @@ dc install-deps
 
 - `dc help`
   Show the command help menu.
-
-## Runtime Architecture
-
-`ComfyUI` core is managed by the Docker image. Runtime behavior is managed by the Python wheel (`dynamic-comfyui-runtime`) and loaded by `dc`.
 
 ### Startup Update Flow (`dc install`)
 
@@ -169,3 +157,12 @@ This lets you update defaults without rebuilding the image: edit the hosted JSON
 If the remote default manifest fails to download, install continues with project resources only (defaults skipped for that run, with a warning).
 
 Default resources use the same schema as the project manifest format above.
+
+## Usage in other RunPod Templates
+
+```bash
+python3 -m pip install --no-cache-dir --upgrade \
+  "git+https://github.com/jeremytenjo/dynamic-comfyui.git"
+
+dc install-deps <project-json-url>
+```
