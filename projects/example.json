@@ -1,5 +1,6 @@
 {
   "require_huggingface_token": false,
+  "import_projects": [],
   "custom_nodes": [
     {
       "repo_dir": "ComfyUI-Impact-Pack",

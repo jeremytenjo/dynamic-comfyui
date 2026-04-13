@@ -108,6 +108,11 @@ Example (`<URL>.json`):
 ```json
 {
   "require_huggingface_token": false,
+  "import_projects": [
+    {
+      "project_url": "https://example.com/base-workflow.json"
+    }
+  ],
   "custom_nodes": [
     {
       "repo_dir": "ComfyUI-Easy-Use",
@@ -126,6 +131,16 @@ Example (`<URL>.json`):
   ]
 }
 ```
+
+`import_projects` is optional. Each entry must be an object with only `project_url`, and values must be absolute HTTP(S) `.json` URLs.
+
+Import behavior:
+- Imports are resolved recursively.
+- Cycles are skipped with a warning.
+- Failed imports are skipped with a warning.
+- Later imports override earlier imports for duplicate `custom_nodes.repo_dir` and `files.target`.
+- Top-level project manifest entries override all imported entries.
+- `require_huggingface_token` is treated as `true` if the top-level or any successfully imported manifest sets it to `true`.
 
 ### Optional Hugging Face Token
 

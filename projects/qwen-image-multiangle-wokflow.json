@@ -1,4 +1,5 @@
 {
+  "import_projects": [],
   "custom_nodes": [
     {
       "repo_dir": "ComfyUI-Manager",

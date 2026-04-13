@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -24,10 +25,16 @@ class FileSpec:
 
 
 @dataclass(frozen=True)
+class ImportProject:
+    project_url: str
+
+
+@dataclass(frozen=True)
 class ManifestData:
     require_hf_token: bool
     custom_nodes: list[CustomNode]
     files: list[FileSpec]
+    import_projects: list[ImportProject]
 
 
 @dataclass(frozen=True)
@@ -112,7 +119,31 @@ def _parse_manifest(path: Path) -> ManifestData:
             raise ValueError(f"files[{idx}].target must be relative to ComfyUI root")
         files.append(FileSpec(url=url, target=target))
 
-    return ManifestData(require_hf_token=require_value, custom_nodes=nodes, files=files)
+    raw_imports = data.get("import_projects", [])
+    if raw_imports is None:
+        raw_imports = []
+    if not isinstance(raw_imports, list):
+        raise ValueError("Manifest field 'import_projects' must be a list")
+
+    import_projects: list[ImportProject] = []
+    for idx, item in enumerate(raw_imports):
+        if not isinstance(item, dict):
+            raise ValueError(f"import_projects[{idx}] must be an object")
+        keys = set(item.keys())
+        if keys != {"project_url"}:
+            raise ValueError(f"import_projects[{idx}] must only contain 'project_url'")
+        project_url = normalize_manifest_url(str(item.get("project_url", "")).strip())
+        if not project_url:
+            raise ValueError(f"import_projects[{idx}].project_url is required")
+        validate_manifest_url(project_url)
+        import_projects.append(ImportProject(project_url=project_url))
+
+    return ManifestData(
+        require_hf_token=require_value,
+        custom_nodes=nodes,
+        files=files,
+        import_projects=import_projects,
+    )
 
 
 def write_empty_manifest(path: Path) -> None:
@@ -180,8 +211,74 @@ def resolve_default_manifest(package_json_path: Path, temp_dir: Path) -> Path:
     return empty
 
 
-def merge_manifests(project_manifest_path: Path, default_manifest_path: Path) -> MergedManifest:
-    project = _parse_manifest(project_manifest_path)
+def _resolve_imported_manifests(root: ManifestData, temp_dir: Path) -> list[ManifestData]:
+    ensure_dir(temp_dir)
+    visited: set[str] = set()
+    visiting: set[str] = set()
+
+    def _resolve(url: str) -> list[ManifestData]:
+        normalized = normalize_manifest_url(url)
+        if normalized in visiting:
+            print(f"Warning: skipping cyclic imported project manifest: {normalized}")
+            return []
+        if normalized in visited:
+            return []
+
+        visiting.add(normalized)
+        candidate = temp_dir / f"import-project-{len(visited) + len(visiting)}.json"
+        try:
+            download_manifest(normalized, candidate)
+            parsed = _parse_manifest(candidate)
+        except Exception as exc:
+            print(f"Warning: failed to import project manifest {normalized} ({exc})")
+            visiting.remove(normalized)
+            return []
+
+        merged: list[ManifestData] = []
+        for nested in parsed.import_projects:
+            merged.extend(_resolve(nested.project_url))
+        merged.append(parsed)
+        visiting.remove(normalized)
+        visited.add(normalized)
+        return merged
+
+    resolved: list[ManifestData] = []
+    for import_project in root.import_projects:
+        resolved.extend(_resolve(import_project.project_url))
+    return resolved
+
+
+def _resolved_project_manifest(project_manifest_path: Path, temp_dir: Path) -> ManifestData:
+    root = _parse_manifest(project_manifest_path)
+    imported = _resolve_imported_manifests(root, temp_dir)
+
+    merged_nodes_map: dict[str, CustomNode] = {}
+    merged_files_map: dict[str, FileSpec] = {}
+    require_hf_token = root.require_hf_token
+
+    for manifest in imported:
+        require_hf_token = require_hf_token or manifest.require_hf_token
+        for node in manifest.custom_nodes:
+            merged_nodes_map[node.repo_dir] = node
+        for file_spec in manifest.files:
+            merged_files_map[file_spec.target] = file_spec
+
+    for node in root.custom_nodes:
+        merged_nodes_map[node.repo_dir] = node
+    for file_spec in root.files:
+        merged_files_map[file_spec.target] = file_spec
+
+    return ManifestData(
+        require_hf_token=require_hf_token,
+        custom_nodes=list(merged_nodes_map.values()),
+        files=list(merged_files_map.values()),
+        import_projects=root.import_projects,
+    )
+
+
+def merge_manifests(project_manifest_path: Path, default_manifest_path: Path, *, temp_dir: Path | None = None) -> MergedManifest:
+    resolved_temp_dir = temp_dir or Path(tempfile.mkdtemp(prefix="dynamic-comfyui-import-projects-"))
+    project = _resolved_project_manifest(project_manifest_path, resolved_temp_dir)
     default = _parse_manifest(default_manifest_path)
 
     merged_nodes_map: dict[str, CustomNode] = {}
@@ -207,11 +304,13 @@ def merge_manifests(project_manifest_path: Path, default_manifest_path: Path) ->
 
 
 def project_requires_hf_token(project_manifest_path: Path) -> bool:
-    return _parse_manifest(project_manifest_path).require_hf_token
+    temp_dir = Path(tempfile.mkdtemp(prefix="dynamic-comfyui-import-projects-"))
+    return _resolved_project_manifest(project_manifest_path, temp_dir).require_hf_token
 
 
 def resources_for_cleanup(project_manifest_path: Path) -> tuple[list[str], list[str]]:
-    data = _parse_manifest(project_manifest_path)
+    temp_dir = Path(tempfile.mkdtemp(prefix="dynamic-comfyui-import-projects-"))
+    data = _resolved_project_manifest(project_manifest_path, temp_dir)
     node_dirs = [node.repo_dir for node in data.custom_nodes]
     file_targets = [file_spec.target for file_spec in data.files]
     return node_dirs, file_targets

@@ -162,7 +162,7 @@ def prepare_project_manifest(network_volume: Path, source_url: str) -> tuple[Pat
 def _load_manifest_context(ctx: RuntimeContext, project_manifest_path: Path) -> tuple[MergedManifest, str | None]:
     temp_dir = Path(tempfile.mkdtemp(prefix="dynamic-comfyui-install-manifest-"))
     default_manifest_path = resolve_default_manifest(ctx.package_json_path, temp_dir)
-    merged = merge_manifests(project_manifest_path, default_manifest_path)
+    merged = merge_manifests(project_manifest_path, default_manifest_path, temp_dir=temp_dir)
 
     hf_token: str | None = None
     if project_requires_hf_token(project_manifest_path):
