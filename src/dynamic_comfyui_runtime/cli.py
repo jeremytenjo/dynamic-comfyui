@@ -61,6 +61,7 @@ def _help_text() -> str:
 
 - dc start
   Enter a direct JSON URL (or press Enter for defaults-only) and install/start ComfyUI.
+  Usage: dc start [project_json_url]
 
 - dc start-new-project
   Enter a new JSON URL (or press Enter for defaults-only) and optionally clean previous project resources.
@@ -96,7 +97,6 @@ def build_parser() -> argparse.ArgumentParser:
 
     for cmd in (
         "install",
-        "start",
         "start-new-project",
         "add-project",
         "replace-project",
@@ -107,6 +107,9 @@ def build_parser() -> argparse.ArgumentParser:
         "help",
     ):
         subparsers.add_parser(cmd)
+
+    start_parser = subparsers.add_parser("start")
+    start_parser.add_argument("project_url", nargs="?", default=None)
 
     install_deps_parser = subparsers.add_parser("install-deps")
     install_deps_parser.add_argument("project_url", nargs="?", default=None)
@@ -144,6 +147,8 @@ def main() -> None:
     try:
         if args.command == "install-deps":
             cmd_install_deps(ctx, args.project_url)
+        elif args.command == "start":
+            cmd_start(ctx, args.project_url)
         else:
             handlers[args.command](ctx)
     except Exception as exc:
