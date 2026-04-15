@@ -203,6 +203,11 @@ def stop_comfyui_service(comfyui_dir: Path) -> None:
     time.sleep(1)
 
 
+def kill_stale_comfyui_processes() -> None:
+    if command_exists("pkill"):
+        run(["pkill", "-f", "ComfyUI"], check=False, quiet=True)
+
+
 def _proxy_url_from_jupyter_url(jupyter_url: str, target_port: int) -> str | None:
     try:
         parsed = urlparse(jupyter_url)
@@ -244,6 +249,7 @@ def start_comfyui_service(comfyui_dir: Path, network_volume: Path, install_start
         print("Ensuring no stale ComfyUI background service is running before launch.")
 
     stop_comfyui_service(comfyui_dir)
+    kill_stale_comfyui_processes()
     stop_setup_page_server()
     _apply_flash_attn_runtime_hotfix()
     sanitize_torch_cuda_alloc_conf()
