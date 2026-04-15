@@ -35,6 +35,7 @@ from .service import (
     enable_manager_gui,
     ensure_comfy_cli_ready,
     ensure_comfyui_workspace,
+    kill_stale_comfyui_processes,
     maybe_enable_nodes_setting,
     prepare_network_volume_and_start_jupyter,
     set_model_directories,
@@ -437,6 +438,7 @@ def cmd_restart(ctx: RuntimeContext) -> None:
     ensure_comfy_cli_ready(network_volume)
     print("Restarting ComfyUI...")
     stop_comfyui_service(comfyui_dir)
+    kill_stale_comfyui_processes()
     startup_lines = start_comfyui_service(comfyui_dir, network_volume)
     for line in startup_lines:
         print(line)
