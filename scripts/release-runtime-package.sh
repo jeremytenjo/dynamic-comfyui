@@ -53,7 +53,7 @@ build_release_notes() {
         echo "## Summary"
         echo
         local commits
-        commits="$(git log --no-merges --pretty='- %s (%h)' "$range")"
+        commits="$(git log --no-merges --pretty='- %s (%h)' --invert-grep --grep='^chore(runtime): bump version to ' "$range")"
         if [ -n "$commits" ]; then
             echo "$commits"
         else
