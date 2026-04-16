@@ -434,6 +434,15 @@ def cmd_replace_project(ctx: RuntimeContext) -> None:
 def cmd_update_nodes_and_models(ctx: RuntimeContext) -> None:
     configure_process_env()
     network_volume = set_network_volume_default(ctx.network_volume)
+    detected_comfyui = discover_comfyui_workspace(network_volume)
+    if detected_comfyui is not None:
+        detected_volume = detected_comfyui.parent
+        if detected_volume != network_volume:
+            print(f"Detected ComfyUI workspace at {detected_comfyui}. Using {detected_volume} as workspace root.")
+        network_volume = detected_volume
+    else:
+        print(f"Could not auto-detect ComfyUI workspace. Using configured workspace root: {network_volume}")
+
     key, _saved_manifest_path, source_url = load_project_state(network_volume)
     manifest_path = active_project_manifest_path(network_volume)
 
@@ -445,6 +454,7 @@ def cmd_update_nodes_and_models(ctx: RuntimeContext) -> None:
         write_empty_manifest(manifest_path)
 
     save_project_state(network_volume, key, manifest_path, source_url)
+    ctx.network_volume = network_volume
     run_comfyui_install_flow(ctx, manifest_path)
 
 
@@ -472,8 +482,17 @@ def cmd_restart(ctx: RuntimeContext) -> None:
 def cmd_stop(ctx: RuntimeContext) -> None:
     configure_process_env()
     network_volume = set_network_volume_default(ctx.network_volume)
-    comfyui_dir, _ = ensure_comfyui_workspace(network_volume)
-    ensure_comfy_cli_ready(network_volume)
+    detected_comfyui = discover_comfyui_workspace(network_volume)
+    if detected_comfyui is not None:
+        detected_volume = detected_comfyui.parent
+        if detected_volume != network_volume:
+            print(f"Detected ComfyUI workspace at {detected_comfyui}. Using {detected_volume} as workspace root.")
+        network_volume = detected_volume
+        comfyui_dir = detected_comfyui
+    else:
+        print(f"Could not auto-detect ComfyUI workspace. Using configured workspace root: {network_volume}")
+        comfyui_dir, _ = ensure_comfyui_workspace(network_volume)
+
     print("Stopping ComfyUI...")
     stop_comfyui_service(comfyui_dir)
     print("ComfyUI stop complete.")
