@@ -40,6 +40,7 @@ from .service import (
     set_model_directories,
     set_network_volume_default,
     start_comfyui_service,
+    start_comfyui_service_for_restart,
     stop_comfyui_service,
     verify_comfyui_core_workspace,
     resolve_runpod_proxy_url,
@@ -451,10 +452,8 @@ def cmd_restart(ctx: RuntimeContext) -> None:
     configure_process_env()
     network_volume = set_network_volume_default(ctx.network_volume)
     comfyui_dir, _ = ensure_comfyui_workspace(network_volume)
-    ensure_comfy_cli_ready(network_volume)
     print("Restarting ComfyUI...")
-    stop_comfyui_service(comfyui_dir)
-    startup_lines = start_comfyui_service(comfyui_dir, network_volume)
+    startup_lines = start_comfyui_service_for_restart(comfyui_dir, network_volume)
     for line in startup_lines:
         print(line)
     print("ComfyUI restart complete.")

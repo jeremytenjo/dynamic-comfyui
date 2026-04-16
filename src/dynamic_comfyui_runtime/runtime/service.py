@@ -199,7 +199,8 @@ except Exception:
 
 
 def stop_comfyui_service(comfyui_dir: Path) -> None:
-    run(["comfy", "--workspace", str(comfyui_dir), "stop"], check=False, quiet=True)
+    if command_exists("comfy"):
+        run(["comfy", "--workspace", str(comfyui_dir), "stop"], check=False, quiet=True)
     run(["pkill", "-f", "ComfyUI"], check=False, quiet=True)
     time.sleep(1)
 
@@ -233,11 +234,31 @@ def resolve_runpod_proxy_url(target_port: int) -> str | None:
     return None
 
 
+def _wait_for_comfyui_ready(metric_start: int) -> list[str]:
+    health_url = "http://127.0.0.1:8188/system_stats"
+    startup_lines: list[str] = []
+    max_wait = 90
+    waited = 0
+    while waited < max_wait:
+        if is_http_reachable(health_url):
+            elapsed = int(time.time()) - metric_start
+            minutes, seconds = divmod(elapsed, 60)
+            startup_time = f"{minutes}m {seconds}s" if minutes else f"{elapsed}s"
+            runpod_url = resolve_runpod_proxy_url(8188)
+            gui_url = runpod_url if runpod_url else "http://127.0.0.1:8188"
+            blue_gui_url = f"\033[34m{gui_url}\033[0m"
+            startup_lines.append(f"🚀 ComfyUI running: {blue_gui_url} ({startup_time})")
+            return startup_lines
+        print("ComfyUI starting...")
+        time.sleep(2)
+        waited += 2
+    raise RuntimeError("ComfyUI failed to become ready within 90s")
+
+
 def start_comfyui_service(comfyui_dir: Path, network_volume: Path, install_start_ts: int | None = None) -> list[str]:
     now = int(time.time())
     metric_start = install_start_ts if install_start_ts and install_start_ts <= now else now
     health_url = "http://127.0.0.1:8188/system_stats"
-    startup_lines: list[str] = []
 
     if is_http_reachable(health_url):
         print("ComfyUI is already running; restarting to load newly installed files and custom nodes.")
@@ -268,30 +289,57 @@ def start_comfyui_service(comfyui_dir: Path, network_volume: Path, install_start
         quiet=True,
     )
 
-    max_wait = 90
-    waited = 0
-    while waited < max_wait:
-        if is_http_reachable(health_url):
-            elapsed = int(time.time()) - metric_start
-            minutes, seconds = divmod(elapsed, 60)
-            if minutes:
-                startup_time = f"{minutes}m {seconds}s"
-            else:
-                startup_time = f"{elapsed}s"
-            runpod_url = resolve_runpod_proxy_url(8188)
-            if runpod_url:
-                gui_url = runpod_url
-            else:
-                gui_url = "http://127.0.0.1:8188"
-            blue_gui_url = f"\033[34m{gui_url}\033[0m"
-            startup_lines.append(f"🚀 ComfyUI running: {blue_gui_url} ({startup_time})")
-            return startup_lines
-        print("ComfyUI starting...")
-        time.sleep(2)
-        waited += 2
+    try:
+        return _wait_for_comfyui_ready(metric_start)
+    except Exception:
+        stop_comfyui_service(comfyui_dir)
+        raise
+
+
+def start_comfyui_service_via_main_py(comfyui_dir: Path, install_start_ts: int | None = None) -> list[str]:
+    now = int(time.time())
+    metric_start = install_start_ts if install_start_ts and install_start_ts <= now else now
+    health_url = "http://127.0.0.1:8188/system_stats"
+
+    if is_http_reachable(health_url):
+        print("ComfyUI is already running; restarting to load newly installed files and custom nodes.")
+    else:
+        print("Ensuring no stale ComfyUI background service is running before launch.")
 
     stop_comfyui_service(comfyui_dir)
-    raise RuntimeError("ComfyUI failed to become ready within 90s")
+    stop_setup_page_server()
+    _apply_flash_attn_runtime_hotfix()
+    sanitize_torch_cuda_alloc_conf()
+
+    print("Starting ComfyUI via main.py")
+    python_cmd = "python" if command_exists("python") else "python3"
+    log_path = Path("/tmp/dynamic-comfyui-main.log")
+    log_path.unlink(missing_ok=True)
+    with log_path.open("w", encoding="utf-8") as log_file:
+        subprocess.Popen(  # noqa: S603
+            [python_cmd, "main.py", "--listen", "0.0.0.0", "--port", "8188"],
+            cwd=str(comfyui_dir),
+            stdout=log_file,
+            stderr=log_file,
+        )
+
+    try:
+        return _wait_for_comfyui_ready(metric_start)
+    except Exception:
+        stop_comfyui_service(comfyui_dir)
+        raise
+
+
+def start_comfyui_service_for_restart(comfyui_dir: Path, network_volume: Path) -> list[str]:
+    if command_exists("comfy"):
+        ensure_comfy_cli_ready(network_volume)
+        return start_comfyui_service(comfyui_dir, network_volume)
+
+    if (comfyui_dir / "main.py").is_file():
+        print("comfy-cli not found. Falling back to `python main.py --listen 0.0.0.0 --port 8188`.")
+        return start_comfyui_service_via_main_py(comfyui_dir)
+
+    raise RuntimeError(f"Cannot restart ComfyUI: missing comfy-cli and main.py not found at {comfyui_dir / 'main.py'}")
 
 
 def prepare_network_volume_and_start_jupyter(network_volume: Path) -> Path:
