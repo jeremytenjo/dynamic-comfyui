@@ -202,6 +202,7 @@ def stop_comfyui_service(comfyui_dir: Path) -> None:
     if command_exists("comfy"):
         run(["comfy", "--workspace", str(comfyui_dir), "stop"], check=False, quiet=True)
     run(["pkill", "-f", "ComfyUI"], check=False, quiet=True)
+    run(["pkill", "-f", "main.py --listen 0.0.0.0 --port 8188"], check=False, quiet=True)
     time.sleep(1)
 
 
@@ -311,7 +312,12 @@ def start_comfyui_service_via_main_py(comfyui_dir: Path, install_start_ts: int |
     _apply_flash_attn_runtime_hotfix()
     sanitize_torch_cuda_alloc_conf()
 
-    print("Starting ComfyUI via main.py")
+    if not comfyui_dir.is_dir():
+        raise RuntimeError(f"ComfyUI workspace directory does not exist: {comfyui_dir}")
+    if not (comfyui_dir / "main.py").is_file():
+        raise RuntimeError(f"ComfyUI main.py not found in workspace: {comfyui_dir / 'main.py'}")
+
+    print(f"Starting ComfyUI via main.py (cwd: {comfyui_dir})")
     python_cmd = "python" if command_exists("python") else "python3"
     log_path = Path("/tmp/dynamic-comfyui-main.log")
     log_path.unlink(missing_ok=True)
@@ -331,15 +337,23 @@ def start_comfyui_service_via_main_py(comfyui_dir: Path, install_start_ts: int |
 
 
 def start_comfyui_service_for_restart(comfyui_dir: Path, network_volume: Path) -> list[str]:
+    main_py = comfyui_dir / "main.py"
+
     if command_exists("comfy"):
         ensure_comfy_cli_ready(network_volume)
-        return start_comfyui_service(comfyui_dir, network_volume)
+        try:
+            return start_comfyui_service(comfyui_dir, network_volume)
+        except Exception as exc:
+            if main_py.is_file():
+                print(f"comfy-cli launch failed ({exc}). Falling back to `python main.py --listen 0.0.0.0 --port 8188`.")
+                return start_comfyui_service_via_main_py(comfyui_dir)
+            raise
 
-    if (comfyui_dir / "main.py").is_file():
+    if main_py.is_file():
         print("comfy-cli not found. Falling back to `python main.py --listen 0.0.0.0 --port 8188`.")
         return start_comfyui_service_via_main_py(comfyui_dir)
 
-    raise RuntimeError(f"Cannot restart ComfyUI: missing comfy-cli and main.py not found at {comfyui_dir / 'main.py'}")
+    raise RuntimeError(f"Cannot restart ComfyUI: missing comfy-cli and main.py not found at {main_py}")
 
 
 def prepare_network_volume_and_start_jupyter(network_volume: Path) -> Path:
