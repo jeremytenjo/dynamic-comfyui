@@ -190,12 +190,25 @@ def install_files(
                 continue
             futures[executor.submit(_process_file, file_spec)] = file_spec
 
+        total_downloads = len(futures)
+        completed_downloads = 0
         for future in as_completed(futures):
             file_spec = futures[future]
+            completed_downloads += 1
+            remaining_downloads = total_downloads - completed_downloads
             failure = future.result()
             if failure is not None:
                 failures.append(failure)
                 print(f"❌ Failed to download {file_spec.target}: {failure.error}")
+                print(
+                    f"Download progress: completed {completed_downloads}/{total_downloads}, "
+                    f"remaining {remaining_downloads}"
+                )
+            else:
+                print(
+                    f"✅ Downloaded {file_spec.target} "
+                    f"(completed {completed_downloads}/{total_downloads}, remaining {remaining_downloads})"
+                )
             if on_progress:
                 on_progress()
 
