@@ -136,6 +136,57 @@ def download_file(
         raise RuntimeError(f"Download failed for {url}: {exc.reason}") from exc
 
 
+def probe_remote_file_size(url: str, *, hf_token: str | None = None) -> int | None:
+    parsed = urllib.parse.urlparse(url)
+    host = parsed.netloc.lower()
+    headers = {
+        "Accept": "*/*",
+        "User-Agent": "dynamic-comfyui-runtime-downloader/1.0",
+    }
+    if "huggingface.co" in host and hf_token:
+        headers["Authorization"] = f"Bearer {hf_token}"
+    if "civitai.com" in host:
+        headers["Referer"] = "https://civitai.com/"
+        headers["Origin"] = "https://civitai.com"
+
+    def _parse_positive_int(raw: str | None) -> int | None:
+        if not raw:
+            return None
+        try:
+            parsed_value = int(raw)
+        except Exception:
+            return None
+        return parsed_value if parsed_value > 0 else None
+
+    try:
+        head_req = urllib.request.Request(url, headers=headers, method="HEAD")
+        with urllib.request.urlopen(head_req, timeout=30) as resp:  # noqa: S310
+            size = _parse_positive_int(resp.headers.get("Content-Length"))
+            if size is not None:
+                return size
+    except Exception:
+        pass
+
+    try:
+        range_headers = dict(headers)
+        range_headers["Range"] = "bytes=0-0"
+        get_req = urllib.request.Request(url, headers=range_headers, method="GET")
+        with urllib.request.urlopen(get_req, timeout=30) as resp:  # noqa: S310
+            content_range = resp.headers.get("Content-Range", "")
+            if "/" in content_range:
+                suffix = content_range.rsplit("/", 1)[-1].strip()
+                size = _parse_positive_int(suffix)
+                if size is not None:
+                    return size
+            size = _parse_positive_int(resp.headers.get("Content-Length"))
+            if size is not None:
+                return size
+    except Exception:
+        return None
+
+    return None
+
+
 def read_nonempty_lines(path: Path) -> list[str]:
     if not path.is_file():
         return []

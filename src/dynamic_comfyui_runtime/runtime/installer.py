@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import shutil
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
 from threading import Lock
 
-from .common import download_file, format_size_for_display, run
+from .common import download_file, format_size_for_display, probe_remote_file_size, run
 from .manifests import CustomNode, FileSpec
 
 
@@ -89,6 +90,43 @@ def install_files(
         print("No files defined in install manifest; skipping file installation.")
         return []
 
+    files_to_download: list[FileSpec] = []
+    for file_spec in files:
+        target_path = comfyui_dir / file_spec.target
+        if not target_path.is_file():
+            files_to_download.append(file_spec)
+
+    if files_to_download:
+        print("Checking available storage for pending downloads...")
+        required_known_bytes = 0
+        unknown_size_targets: list[str] = []
+        for file_spec in files_to_download:
+            size = probe_remote_file_size(file_spec.url, hf_token=hf_token)
+            if size is None:
+                unknown_size_targets.append(file_spec.target)
+                continue
+            required_known_bytes += size
+
+        free_bytes = shutil.disk_usage(comfyui_dir).free
+        print(
+            "Storage preflight: "
+            f"known required={format_size_for_display(required_known_bytes)}, "
+            f"available={format_size_for_display(free_bytes)}"
+        )
+        if required_known_bytes > free_bytes:
+            raise RuntimeError(
+                "Insufficient storage for downloads. "
+                f"Need at least {format_size_for_display(required_known_bytes)} "
+                f"but only {format_size_for_display(free_bytes)} is available."
+            )
+        if unknown_size_targets:
+            print(
+                "Warning: could not determine remote size for "
+                f"{len(unknown_size_targets)} file(s), so storage fit cannot be fully guaranteed."
+            )
+            for target in unknown_size_targets:
+                print(f" - {target}")
+
     progress_lock = Lock()
 
     def _process_file(file_spec: FileSpec) -> FileInstallFailure | None:
@@ -98,20 +136,33 @@ def install_files(
         try:
             last_percent_bucket = -1
             last_unknown_report_mb = -1
+            last_reported_bytes = 0
+            last_report_ts = time.monotonic()
 
             def _on_download_progress(downloaded: int, total_size: int | None) -> None:
-                nonlocal last_percent_bucket, last_unknown_report_mb
+                nonlocal last_percent_bucket, last_unknown_report_mb, last_reported_bytes, last_report_ts
                 with progress_lock:
                     if total_size and total_size > 0:
                         percent = int((downloaded * 100) / total_size)
                         bucket = min(percent // 10, 10)
-                        if bucket <= last_percent_bucket:
+                        now = time.monotonic()
+                        progressed_bytes = downloaded - last_reported_bytes
+                        should_print = False
+                        if bucket > last_percent_bucket:
+                            last_percent_bucket = bucket
+                            should_print = True
+                        elif progressed_bytes >= 256 * 1024 * 1024:
+                            should_print = True
+                        elif progressed_bytes > 0 and (now - last_report_ts) >= 20:
+                            should_print = True
+                        if not should_print:
                             return
-                        last_percent_bucket = bucket
                         print(
                             f"  Downloading {file_spec.target}: {percent}% "
                             f"({format_size_for_display(downloaded)}/{format_size_for_display(total_size)})"
                         )
+                        last_reported_bytes = downloaded
+                        last_report_ts = now
                         return
 
                     downloaded_mb = downloaded // (1024 * 1024)
