@@ -4,6 +4,7 @@ import shutil
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
+from threading import Lock
 
 from .common import download_file, run
 from .manifests import CustomNode, FileSpec
@@ -88,12 +89,45 @@ def install_files(
         print("No files defined in install manifest; skipping file installation.")
         return []
 
+    progress_lock = Lock()
+
+    def _format_size(byte_count: int) -> str:
+        mb = byte_count / (1024 * 1024)
+        if mb >= 1000:
+            return f"{byte_count / (1024 * 1024 * 1024):.2f} GB"
+        return f"{mb:.1f} MB"
+
     def _process_file(file_spec: FileSpec) -> FileInstallFailure | None:
         target_path = comfyui_dir / file_spec.target
         if target_path.is_file():
             return None
         try:
-            download_file(file_spec.url, target_path, hf_token=hf_token)
+            last_percent_bucket = -1
+            last_unknown_report_mb = -1
+
+            def _on_download_progress(downloaded: int, total_size: int | None) -> None:
+                nonlocal last_percent_bucket, last_unknown_report_mb
+                with progress_lock:
+                    if total_size and total_size > 0:
+                        percent = int((downloaded * 100) / total_size)
+                        bucket = min(percent // 10, 10)
+                        if bucket <= last_percent_bucket:
+                            return
+                        last_percent_bucket = bucket
+                        print(
+                            f"  Downloading {file_spec.target}: {percent}% "
+                            f"({_format_size(downloaded)}/{_format_size(total_size)})"
+                        )
+                        return
+
+                    downloaded_mb = downloaded // (1024 * 1024)
+                    report_bucket = downloaded_mb // 25
+                    if report_bucket <= last_unknown_report_mb:
+                        return
+                    last_unknown_report_mb = report_bucket
+                    print(f"  Downloading {file_spec.target}: {_format_size(downloaded)}")
+
+            download_file(file_spec.url, target_path, hf_token=hf_token, on_progress=_on_download_progress)
         except Exception as exc:
             return FileInstallFailure(target=file_spec.target, error=str(exc))
         return None

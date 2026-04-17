@@ -88,7 +88,13 @@ def is_http_reachable(url: str, timeout: int = 5) -> bool:
         return False
 
 
-def download_file(url: str, target: Path, *, hf_token: str | None = None) -> None:
+def download_file(
+    url: str,
+    target: Path,
+    *,
+    hf_token: str | None = None,
+    on_progress: callable | None = None,
+) -> None:
     ensure_dir(target.parent)
     parsed = urllib.parse.urlparse(url)
     host = parsed.netloc.lower()
@@ -104,7 +110,26 @@ def download_file(url: str, target: Path, *, hf_token: str | None = None) -> Non
     req = urllib.request.Request(url, headers=headers, method="GET")
     try:
         with urllib.request.urlopen(req, timeout=120) as resp:  # noqa: S310
-            target.write_bytes(resp.read())
+            total_header = resp.headers.get("Content-Length")
+            total_size: int | None = None
+            if total_header:
+                try:
+                    parsed_size = int(total_header)
+                    total_size = parsed_size if parsed_size > 0 else None
+                except Exception:
+                    total_size = None
+
+            downloaded = 0
+            chunk_size = 1024 * 1024
+            with target.open("wb") as out_file:
+                while True:
+                    chunk = resp.read(chunk_size)
+                    if not chunk:
+                        break
+                    out_file.write(chunk)
+                    downloaded += len(chunk)
+                    if on_progress:
+                        on_progress(downloaded, total_size)
     except urllib.error.HTTPError as exc:
         raise RuntimeError(f"Download failed ({exc.code}) for {url}") from exc
     except urllib.error.URLError as exc:
