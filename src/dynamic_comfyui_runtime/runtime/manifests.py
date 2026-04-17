@@ -202,7 +202,8 @@ def resolve_default_manifest(package_json_path: Path, temp_dir: Path) -> Path:
         try:
             download_file(default_url, candidate)
             if candidate.is_file() and candidate.stat().st_size > 0:
-                print(f"Loaded remote default resources manifest: {default_url}")
+                blue_default_url = f"\033[34m{default_url}\033[0m"
+                print(f"Loaded remote default resources manifest: {blue_default_url}")
                 return candidate
         except Exception as exc:
             print(f"Warning: failed to download remote default resources manifest: {default_url} ({exc})")
