@@ -206,6 +206,13 @@ def stop_comfyui_service(comfyui_dir: Path) -> None:
     time.sleep(1)
 
 
+def is_main_py_listen_process_running() -> bool:
+    if not command_exists("pgrep"):
+        return False
+    out = run(["pgrep", "-af", "main.py --listen 0.0.0.0"], check=False, quiet=True)
+    return bool((out.stdout or "").strip())
+
+
 def _proxy_url_from_jupyter_url(jupyter_url: str, target_port: int) -> str | None:
     try:
         parsed = urlparse(jupyter_url)
@@ -338,6 +345,10 @@ def start_comfyui_service_via_main_py(comfyui_dir: Path, install_start_ts: int |
 
 def start_comfyui_service_for_restart(comfyui_dir: Path, network_volume: Path) -> list[str]:
     main_py = comfyui_dir / "main.py"
+
+    if is_main_py_listen_process_running():
+        print("Detected running main.py listen process. Restarting via `python main.py --listen 0.0.0.0 --port 8188`.")
+        return start_comfyui_service_via_main_py(comfyui_dir)
 
     if command_exists("comfy"):
         ensure_comfy_cli_ready(network_volume)
