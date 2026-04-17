@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 from dataclasses import dataclass
 from importlib import metadata
@@ -21,6 +22,8 @@ class SystemInfo:
     gpu_model: str = "N/A"
     video_vram: str = "N/A"
     system_ram: str = "N/A"
+    pod_volume: str | None = None
+    network_volume: str | None = None
 
 
 def _run_capture(cmd: list[str], *, cwd: Path | None = None) -> str | None:
@@ -175,6 +178,39 @@ def _detect_system_ram() -> str:
     return "N/A"
 
 
+def _format_disk_usage(path: Path) -> str | None:
+    if not path.exists():
+        return None
+
+    try:
+        usage = shutil.disk_usage(path)
+    except Exception:
+        return None
+
+    total = usage.total
+    used = usage.used
+    if total <= 0:
+        return None
+    pct = int((used * 100) / total)
+    return f"{format_size_for_display(used)} / {format_size_for_display(total)} ({pct}%)"
+
+
+def _detect_pod_volume() -> str | None:
+    # Pod container/root filesystem usage.
+    return _format_disk_usage(Path("/"))
+
+
+def _detect_network_volume(comfyui_dir: Path | None) -> str | None:
+    if comfyui_dir and comfyui_dir.is_dir():
+        # ComfyUI workspace is typically "<network_volume>/ComfyUI".
+        return _format_disk_usage(comfyui_dir.parent)
+
+    env_volume = os.environ.get("NETWORK_VOLUME", "").strip()
+    if not env_volume:
+        return None
+    return _format_disk_usage(Path(env_volume))
+
+
 def collect_system_info(comfyui_dir: Path | None = None) -> SystemInfo:
     pytorch_version, cuda_core_version = _detect_torch_and_cuda()
     nvidia_driver_version, gpu_model, video_vram = _detect_gpu_details()
@@ -188,6 +224,8 @@ def collect_system_info(comfyui_dir: Path | None = None) -> SystemInfo:
         gpu_model=gpu_model,
         video_vram=video_vram,
         system_ram=_detect_system_ram(),
+        pod_volume=_detect_pod_volume(),
+        network_volume=_detect_network_volume(comfyui_dir),
     )
 
 
@@ -203,6 +241,10 @@ def print_system_info(info: SystemInfo) -> None:
         ("Video VRAM", info.video_vram),
         ("System RAM", info.system_ram),
     ]
+    if info.pod_volume:
+        rows.append(("Pod Volume", info.pod_volume))
+    if info.network_volume:
+        rows.append(("Network Volume", info.network_volume))
 
     label_width = max(len(label) for label, _ in rows)
     print("System info")
