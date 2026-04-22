@@ -94,7 +94,7 @@ Run this command in the terminal to stop ComfyUI `dynamic-comfyui stop`
 
 Run this command in the terminal to update nodes and files (uses the last saved JSON URL) `dynamic-comfyui update-nodes-and-models`
 
-Run this command in the terminal to install custom nodes/files only `dynamic-comfyui install-deps <project-json-url>`
+Run this command in the terminal to install custom nodes/files only `dynamic-comfyui install-deps <project-json-url> [project-json-url ...]`
 
 Run this command in the terminal to update the dynamic-comfyui runtime package to latest `dynamic-comfyui update-dc`
 
@@ -340,7 +340,7 @@ def cmd_start(ctx: RuntimeContext, project_url: str | None = None) -> None:
         raise
 
 
-def cmd_install_deps(ctx: RuntimeContext, project_url: str | None = None) -> None:
+def cmd_install_deps(ctx: RuntimeContext, project_urls: list[str] | None = None) -> None:
     configure_process_env()
     network_volume = set_network_volume_default(ctx.network_volume)
     detected_comfyui = discover_comfyui_workspace(network_volume)
@@ -352,18 +352,30 @@ def cmd_install_deps(ctx: RuntimeContext, project_url: str | None = None) -> Non
     else:
         print(f"Could not auto-detect ComfyUI workspace. Using configured workspace root: {network_volume}")
 
-    if project_url is not None:
-        manifest_path, source_url = prepare_project_manifest(network_volume, project_url)
-    else:
+    if not project_urls:
         manifest_path, source_url = prompt_and_prepare_project_manifest(network_volume)
-    _save_selected_project(network_volume, manifest_path, source_url)
+        _save_selected_project(network_volume, manifest_path, source_url)
+        ctx.network_volume = network_volume
+        try:
+            run_dependency_install_flow(ctx, manifest_path)
+        except Exception as exc:
+            comfyui_dir, _ = ensure_comfyui_workspace(network_volume)
+            mark_failed(None, comfyui_dir, f"Dependency installation failed. {exc}")
+            raise
+        return
+
+    total = len(project_urls)
     ctx.network_volume = network_volume
-    try:
-        run_dependency_install_flow(ctx, manifest_path)
-    except Exception as exc:
-        comfyui_dir, _ = ensure_comfyui_workspace(network_volume)
-        mark_failed(None, comfyui_dir, f"Dependency installation failed. {exc}")
-        raise
+    for index, project_url in enumerate(project_urls, start=1):
+        manifest_path, source_url = prepare_project_manifest(network_volume, project_url)
+        print(f"Installing dependencies for project [{index}/{total}]: {source_url}")
+        _save_selected_project(network_volume, manifest_path, source_url)
+        try:
+            run_dependency_install_flow(ctx, manifest_path)
+        except Exception as exc:
+            comfyui_dir, _ = ensure_comfyui_workspace(network_volume)
+            mark_failed(None, comfyui_dir, f"Dependency installation failed. {exc}")
+            raise
 
 
 def _snapshot_previous_manifest(network_volume: Path) -> tuple[str, str, Path | None]:

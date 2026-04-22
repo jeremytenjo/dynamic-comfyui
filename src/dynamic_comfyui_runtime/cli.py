@@ -59,7 +59,7 @@ def _help_text() -> str:
   Boot runtime services for the pod (Jupyter + setup page + optional auto-start).
 
 - dc install-deps
-  Install custom nodes/files only. Usage: dc install-deps [project_json_url]
+  Install custom nodes/files only. Usage: dc install-deps [project_json_url ...]
 
 - dc start
   Enter a direct JSON URL (or press Enter for defaults-only) and install/start ComfyUI.
@@ -122,7 +122,7 @@ def build_parser() -> argparse.ArgumentParser:
     start_parser.add_argument("project_url", nargs="?", default=None)
 
     install_deps_parser = subparsers.add_parser("install-deps")
-    install_deps_parser.add_argument("project_url", nargs="?", default=None)
+    install_deps_parser.add_argument("project_urls", nargs="*", default=None)
     return parser
 
 
@@ -158,7 +158,7 @@ def main() -> None:
 
     try:
         if args.command == "install-deps":
-            cmd_install_deps(ctx, args.project_url)
+            cmd_install_deps(ctx, args.project_urls)
         elif args.command == "start":
             cmd_start(ctx, args.project_url)
         else:
