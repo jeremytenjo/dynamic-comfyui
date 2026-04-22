@@ -8,7 +8,10 @@ from dataclasses import dataclass
 from importlib import metadata
 from pathlib import Path
 
+from rich.table import Table
+
 from .common import format_size_for_display
+from .ui import console
 
 
 @dataclass
@@ -246,7 +249,9 @@ def print_system_info(info: SystemInfo) -> None:
     if info.network_volume:
         rows.append(("Network Volume", info.network_volume))
 
-    label_width = max(len(label) for label, _ in rows)
-    print("System info")
+    table = Table(title="System Info")
+    table.add_column("Component", style="info")
+    table.add_column("Value")
     for label, value in rows:
-        print(f"{label:<{label_width}}  {value}")
+        table.add_row(label, value)
+    console().print(table)

@@ -8,9 +8,11 @@ import re
 from threading import Lock
 
 from rich.progress import BarColumn, DownloadColumn, Progress, TaskID, TextColumn, TimeElapsedColumn, TransferSpeedColumn
+from rich.table import Table
 
 from .common import download_file, format_size_for_display, probe_remote_file_size, run
 from .manifests import CustomNode, FileSpec
+from .ui import console, is_interactive_terminal, print_error, print_info, print_success, print_warning, status
 
 
 @dataclass(frozen=True)
@@ -30,15 +32,15 @@ def install_custom_nodes(
     custom_nodes: list[CustomNode], custom_nodes_dir: Path, *, on_progress: callable | None = None
 ) -> list[NodeInstallFailure]:
     if not custom_nodes:
-        print("No custom nodes defined in install manifest; skipping node installation.")
+        print_info("No custom nodes defined in install manifest; skipping node installation.")
         return []
 
     failures: list[NodeInstallFailure] = []
     for idx, node in enumerate(custom_nodes, start=1):
-        print(f"[{idx}/{len(custom_nodes)}] Ensuring git node {node.repo_dir}")
+        print_info(f"[{idx}/{len(custom_nodes)}] Ensuring git node {node.repo_dir}")
         node_path = custom_nodes_dir / node.repo_dir
         if node_path.is_dir():
-            print(f"Custom node already installed, skipping: {node.repo_dir}")
+            print_info(f"Custom node already installed, skipping: {node.repo_dir}")
             if on_progress:
                 on_progress()
             continue
@@ -46,10 +48,11 @@ def install_custom_nodes(
         if node_path.exists():
             shutil.rmtree(node_path)
         try:
-            run(["git", "clone", node.repo, str(node_path)])
+            with status(f"Cloning {node.repo_dir}..."):
+                run(["git", "clone", node.repo, str(node_path)])
         except Exception as exc:
             failures.append(NodeInstallFailure(repo_dir=node.repo_dir, step="git clone", error=str(exc)))
-            print(f"❌ Failed to clone custom node {node.repo_dir}: {exc}")
+            print_error(f"Failed to clone custom node {node.repo_dir}: {exc}")
             if on_progress:
                 on_progress()
             continue
@@ -57,10 +60,11 @@ def install_custom_nodes(
         requirements = node_path / "requirements.txt"
         if requirements.is_file():
             try:
-                run(["python3", "-m", "pip", "install", "--no-cache-dir", "-r", str(requirements)])
+                with status(f"Installing requirements for {node.repo_dir}..."):
+                    run(["python3", "-m", "pip", "install", "--no-cache-dir", "-r", str(requirements)])
             except Exception as exc:
                 failures.append(NodeInstallFailure(repo_dir=node.repo_dir, step="requirements install", error=str(exc)))
-                print(f"❌ Failed to install requirements for {node.repo_dir}: {exc}")
+                print_error(f"Failed to install requirements for {node.repo_dir}: {exc}")
                 if on_progress:
                     on_progress()
                 continue
@@ -68,10 +72,11 @@ def install_custom_nodes(
         install_py = node_path / "install.py"
         if install_py.is_file():
             try:
-                run(["python3", "install.py"], cwd=node_path)
+                with status(f"Running install.py for {node.repo_dir}..."):
+                    run(["python3", "install.py"], cwd=node_path)
             except Exception as exc:
                 failures.append(NodeInstallFailure(repo_dir=node.repo_dir, step="install.py", error=str(exc)))
-                print(f"❌ Failed to run install.py for {node.repo_dir}: {exc}")
+                print_error(f"Failed to run install.py for {node.repo_dir}: {exc}")
                 if on_progress:
                     on_progress()
                 continue
@@ -89,7 +94,7 @@ def install_files(
     on_progress: callable | None = None,
 ) -> list[FileInstallFailure]:
     if not files:
-        print("No files defined in install manifest; skipping file installation.")
+        print_info("No files defined in install manifest; skipping file installation.")
         return []
 
     files_to_download: list[FileSpec] = []
@@ -99,24 +104,34 @@ def install_files(
             files_to_download.append(file_spec)
 
     if files_to_download:
-        print("Checking available storage for pending downloads...")
+        print_info("Checking available storage for pending downloads...")
         required_known_bytes = 0
         known_sizes_by_target: dict[str, int] = {}
         unknown_size_targets: list[str] = []
+        preflight_rows: list[tuple[str, str, str]] = []
         for file_spec in files_to_download:
             size = probe_remote_file_size(file_spec.url, hf_token=hf_token)
             if size is None:
                 unknown_size_targets.append(file_spec.target)
+                preflight_rows.append((file_spec.target, "Unknown", "Unknown"))
                 continue
             known_sizes_by_target[file_spec.target] = size
             required_known_bytes += size
+            preflight_rows.append((file_spec.target, format_size_for_display(size), "Yes"))
 
         free_bytes = shutil.disk_usage(comfyui_dir).free
-        print(
+        print_info(
             "Storage preflight: "
             f"known required={format_size_for_display(required_known_bytes)}, "
             f"available={format_size_for_display(free_bytes)}"
         )
+        preflight_table = Table(title="Download Preflight", show_lines=False)
+        preflight_table.add_column("Target", style="info", overflow="fold")
+        preflight_table.add_column("Remote Size", justify="right")
+        preflight_table.add_column("Known", justify="center")
+        for target, size_display, known in preflight_rows:
+            preflight_table.add_row(target, size_display, known)
+        console().print(preflight_table)
         if required_known_bytes > free_bytes:
             raise RuntimeError(
                 "Insufficient storage for downloads. "
@@ -124,12 +139,12 @@ def install_files(
                 f"but only {format_size_for_display(free_bytes)} is available."
             )
         if unknown_size_targets:
-            print(
+            print_warning(
                 "Warning: could not determine remote size for "
                 f"{len(unknown_size_targets)} file(s), so storage fit cannot be fully guaranteed."
             )
             for target in unknown_size_targets:
-                print(f" - {target}")
+                print_warning(f" - {target}")
     else:
         known_sizes_by_target = {}
 
@@ -174,6 +189,7 @@ def install_files(
                     if delta > 0:
                         progress.advance(task_id, delta)
                         last_progress_bytes = downloaded
+                    progress_snapshots[file_spec.target] = (downloaded, total)
 
             download_file(file_spec.url, target_path, hf_token=hf_token, on_progress=_on_download_progress)
         except Exception as exc:
@@ -187,6 +203,7 @@ def install_files(
         return None
 
     failures: list[FileInstallFailure] = []
+    progress_snapshots: dict[str, tuple[int, int | None]] = {}
     futures: dict = {}
     with Progress(
         TextColumn("{task.description}"),
@@ -194,13 +211,15 @@ def install_files(
         DownloadColumn(),
         TransferSpeedColumn(),
         TimeElapsedColumn(),
-        transient=True,
+        transient=is_interactive_terminal(),
     ) as progress, ThreadPoolExecutor(max_workers=5) as executor:
+        overall_task_id = progress.add_task("Overall download completion", total=len(files))
         for idx, file_spec in enumerate(files, start=1):
             target_path = comfyui_dir / file_spec.target
             print(f"[{idx}/{len(files)}] Processing {file_spec.target}")
             if target_path.is_file():
-                print(f"File already exists, skipping: {file_spec.target}")
+                print_info(f"File already exists, skipping: {file_spec.target}")
+                progress.advance(overall_task_id, 1)
                 if on_progress:
                     on_progress()
                 continue
@@ -209,6 +228,7 @@ def install_files(
                 f"Downloading {file_spec.target}",
                 total=initial_total if initial_total and initial_total > 0 else None,
             )
+            progress_snapshots[file_spec.target] = (0, initial_total if initial_total and initial_total > 0 else None)
             futures[executor.submit(_process_file, file_spec, progress, task_id)] = (file_spec, task_id)
 
         total_downloads = len(futures)
@@ -222,13 +242,29 @@ def install_files(
             if failure is not None:
                 failures.append(failure)
                 progress.update(task_id, visible=False)
-                print(f"❌ Failed to download {file_spec.target}: {_colorize_urls_red(failure.error)}")
-                print(f"Download progress: {blue_remaining}")
+                print_error(f"Failed to download {file_spec.target}: {_colorize_urls_red(failure.error)}")
+                print_info(f"Download progress: {blue_remaining}")
             else:
+                task = progress.tasks[task_id]
+                progress_snapshots[file_spec.target] = (int(task.completed), int(task.total) if task.total else None)
                 progress.update(task_id, visible=False)
-                print(f"✅ Downloaded {file_spec.target} {blue_remaining}")
+                print_success(f"Downloaded {file_spec.target} {blue_remaining}")
+            progress.advance(overall_task_id, 1)
             if on_progress:
                 on_progress()
+
+    if failures:
+        snapshot_table = Table(title="Failed Download Progress Snapshot")
+        snapshot_table.add_column("Target", style="info", overflow="fold")
+        snapshot_table.add_column("Progress", justify="right")
+        for failure in failures:
+            completed, total = progress_snapshots.get(failure.target, (0, None))
+            if total and total > 0:
+                progress_display = f"{format_size_for_display(completed)}/{format_size_for_display(total)}"
+            else:
+                progress_display = format_size_for_display(completed)
+            snapshot_table.add_row(failure.target, progress_display)
+        console().print(snapshot_table)
 
     # Keep deterministic failure ordering for summaries.
     failures.sort(key=lambda item: item.target)
@@ -239,13 +275,13 @@ def remove_project_resources(node_dirs: list[str], file_targets: list[str], cust
     for repo_dir in node_dirs:
         node_path = custom_nodes_dir / repo_dir
         if node_path.is_dir():
-            print(f"Removing old custom node: {repo_dir}")
+            print_info(f"Removing old custom node: {repo_dir}")
             shutil.rmtree(node_path)
 
     for target in file_targets:
         file_path = comfyui_dir / target
         if file_path.is_file():
-            print(f"Removing old file: {target}")
+            print_info(f"Removing old file: {target}")
             file_path.unlink()
 
 

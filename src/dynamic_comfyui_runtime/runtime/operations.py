@@ -4,14 +4,14 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
+from rich.tree import Tree
+
 from .common import ensure_dir, now_epoch, require_tools, utc_timestamp
 from .installer import (
     FileInstallFailure,
     NodeInstallFailure,
     install_custom_nodes,
     install_files,
-    print_custom_nodes_summary,
-    print_files_summary,
     remove_project_resources,
 )
 from .manifests import (
@@ -46,6 +46,18 @@ from .service import (
     resolve_runpod_proxy_url,
 )
 from .system_info import collect_system_info, print_system_info
+from .ui import (
+    console,
+    print_error,
+    print_info,
+    print_panel,
+    print_rule,
+    print_success,
+    print_warning,
+    prompt_confirm,
+    prompt_text,
+    status,
+)
 from .updater import uninstall_runtime_package, upgrade_runtime_package
 
 
@@ -132,14 +144,14 @@ def write_install_sentinel(network_volume: Path, comfyui_dir: Path) -> None:
 
 def _prompt_manifest_url() -> str:
     while True:
-        raw = input("Enter project URL: ").strip()
+        raw = prompt_text("Enter project URL").strip()
         if not raw:
             return ""
         normalized = normalize_manifest_url(raw)
         try:
             validate_manifest_url(normalized)
         except Exception as exc:
-            print(f"Invalid URL: {exc}")
+            print_warning(f"Invalid URL: {exc}")
             continue
         return normalized
 
@@ -152,17 +164,19 @@ def prompt_and_prepare_project_manifest(network_volume: Path) -> tuple[Path, str
             write_empty_manifest(manifest_path)
             return manifest_path, ""
         try:
-            download_manifest(source_url, manifest_path)
+            with status("Downloading project manifest..."):
+                download_manifest(source_url, manifest_path)
             return manifest_path, source_url
         except Exception as exc:
-            print(f"❌ Failed to download project manifest: {exc}")
+            print_error(f"Failed to download project manifest: {exc}")
 
 
 def prepare_project_manifest(network_volume: Path, source_url: str) -> tuple[Path, str]:
     manifest_path = active_project_manifest_path(network_volume)
     normalized = normalize_manifest_url(source_url.strip())
     validate_manifest_url(normalized)
-    download_manifest(normalized, manifest_path)
+    with status("Downloading project manifest..."):
+        download_manifest(normalized, manifest_path)
     return manifest_path, normalized
 
 
@@ -178,9 +192,13 @@ def _load_manifest_context(
 
     hf_token: str | None = None
     if project_requires_hf_token(project_manifest_path):
-        print("This project manifest requires a Hugging Face token for file downloads.")
-        print("Create one at: https://huggingface.co/settings/tokens")
-        token = input("Enter your Hugging Face token: ").strip()
+        print_panel(
+            "This project manifest requires a Hugging Face token for file downloads.\n"
+            "Create one at: [url]https://huggingface.co/settings/tokens[/].",
+            title="Hugging Face Token Required",
+            style="warning",
+        )
+        token = prompt_text("Enter your Hugging Face token", password=True).strip()
         if not token:
             raise RuntimeError("Hugging Face token is required by this project manifest")
         hf_token = token
@@ -190,14 +208,14 @@ def _load_manifest_context(
 
 def _print_failures(node_failures: list[NodeInstallFailure], file_failures: list[FileInstallFailure]) -> None:
     if node_failures:
-        print("❌ Failed custom node installs:")
+        print_error("Failed custom node installs:")
         for failure in node_failures:
-            print(f" - {failure.repo_dir} [{failure.step}] ({failure.error})")
+            print_error(f" - {failure.repo_dir} [{failure.step}] ({failure.error})")
 
     if file_failures:
-        print("❌ Failed file downloads:")
+        print_error("Failed file downloads:")
         for failure in file_failures:
-            print(f" - {failure.target} ({failure.error})")
+            print_error(f" - {failure.target} ({failure.error})")
 
 
 def _print_resource_summary(
@@ -207,18 +225,44 @@ def _print_resource_summary(
     node_failures: list[NodeInstallFailure],
     file_failures: list[FileInstallFailure],
 ) -> None:
-    print_custom_nodes_summary("✅ Installed custom nodes (default resources):", merged.default_custom_nodes, custom_nodes_dir)
-    print_custom_nodes_summary("✅ Installed custom nodes (project manifest):", merged.project_custom_nodes, custom_nodes_dir)
-    print_files_summary("✅ Installed files (default resources):", merged.default_files, comfyui_dir)
-    print_files_summary("✅ Installed files (project manifest):", merged.project_files, comfyui_dir)
+    summary_tree = Tree("[success]Install Summary[/]")
+    nodes_default_branch = summary_tree.add("[info]Custom nodes (default resources)[/]")
+    for node in merged.default_custom_nodes:
+        suffix = "" if (custom_nodes_dir / node.repo_dir).is_dir() else " [muted](missing on disk)[/]"
+        nodes_default_branch.add(f"{node.repo_dir}{suffix}")
+    if not merged.default_custom_nodes:
+        nodes_default_branch.add("[muted](none)[/]")
+
+    nodes_project_branch = summary_tree.add("[info]Custom nodes (project manifest)[/]")
+    for node in merged.project_custom_nodes:
+        suffix = "" if (custom_nodes_dir / node.repo_dir).is_dir() else " [muted](missing on disk)[/]"
+        nodes_project_branch.add(f"{node.repo_dir}{suffix}")
+    if not merged.project_custom_nodes:
+        nodes_project_branch.add("[muted](none)[/]")
+
+    files_default_branch = summary_tree.add("[info]Files (default resources)[/]")
+    for spec in merged.default_files:
+        suffix = "" if (comfyui_dir / spec.target).is_file() else " [muted](missing on disk)[/]"
+        files_default_branch.add(f"{spec.target}{suffix}")
+    if not merged.default_files:
+        files_default_branch.add("[muted](none)[/]")
+
+    files_project_branch = summary_tree.add("[info]Files (project manifest)[/]")
+    for spec in merged.project_files:
+        suffix = "" if (comfyui_dir / spec.target).is_file() else " [muted](missing on disk)[/]"
+        files_project_branch.add(f"{spec.target}{suffix}")
+    if not merged.project_files:
+        files_project_branch.add("[muted](none)[/]")
+
+    print_rule("Summary")
+    console().print(summary_tree)
     _print_failures(node_failures, file_failures)
 
 
 def _print_comfyui_link() -> None:
     runpod_url = resolve_runpod_proxy_url(8188)
     gui_url = runpod_url if runpod_url else "http://127.0.0.1:8188"
-    blue_gui_url = f"\033[34m{gui_url}\033[0m"
-    print(f"🚀 ComfyUI page: {blue_gui_url}")
+    print_success(f"ComfyUI page: [url]{gui_url}[/]")
 
 
 def _execute_dependency_install(
@@ -228,29 +272,32 @@ def _execute_dependency_install(
     manager_quiet: bool,
     default_manifest_path: Path | None = None,
 ) -> InstallExecution:
+    print_rule("Dependency Install")
     network_volume = set_network_volume_default(ctx.network_volume)
     comfyui_dir, custom_nodes_dir = ensure_comfyui_workspace(network_volume)
     set_model_directories(comfyui_dir)
     require_tools(["python3", "git"])
 
-    merged, hf_token = _load_manifest_context(
-        ctx,
-        project_manifest_path,
-        default_manifest_path=default_manifest_path,
-    )
+    with status("Loading and merging manifests..."):
+        merged, hf_token = _load_manifest_context(
+            ctx,
+            project_manifest_path,
+            default_manifest_path=default_manifest_path,
+        )
     mark_running(merged, comfyui_dir)
 
-    print("Ensuring ComfyUI core workspace is installed...")
-    ensure_comfy_cli_ready(network_volume)
-    verify_comfyui_core_workspace(comfyui_dir)
-    enable_manager_gui(comfyui_dir, quiet=manager_quiet)
+    print_rule("ComfyUI Core")
+    with status("Ensuring ComfyUI core workspace is installed..."):
+        ensure_comfy_cli_ready(network_volume)
+        verify_comfyui_core_workspace(comfyui_dir)
+        enable_manager_gui(comfyui_dir, quiet=manager_quiet)
 
-    print("Ensuring required custom nodes are installed...")
+    print_rule("Custom Nodes")
     node_failures = install_custom_nodes(
         merged.merged_custom_nodes, custom_nodes_dir, on_progress=lambda: mark_running(merged, comfyui_dir)
     )
 
-    print("Installing required files...")
+    print_rule("Files")
     file_failures = install_files(
         merged.merged_files, comfyui_dir, hf_token=hf_token, on_progress=lambda: mark_running(merged, comfyui_dir)
     )
@@ -284,7 +331,7 @@ def run_comfyui_install_flow(ctx: RuntimeContext, project_manifest_path: Path) -
         execution.file_failures,
     )
     for line in startup_lines:
-        print(line)
+        print_info(line)
 
 
 def run_dependency_install_flow(
@@ -312,7 +359,7 @@ def run_dependency_install_flow(
         execution.file_failures,
     )
     if show_completion:
-        print("Dependency installation complete.")
+        print_success("Dependency installation complete.")
     if show_comfyui_link:
         _print_comfyui_link()
 
@@ -329,16 +376,16 @@ def cmd_install(ctx: RuntimeContext) -> None:
     mark_idle(None, comfyui_dir)
     start_setup_page_server(ctx.setup_page_html_path)
 
-    print("Jupyter is running.")
+    print_success("Jupyter is running.")
     if verify_install_sentinel(network_volume):
-        print("Install marker found. Starting ComfyUI...")
+        print_info("Install marker found. Starting ComfyUI...")
         try:
             ensure_comfy_cli_ready(network_volume)
             startup_lines = start_comfyui_service(comfyui_dir, network_volume)
             for line in startup_lines:
-                print(line)
+                print_info(line)
         except Exception as exc:
-            print(f"Failed to auto-start ComfyUI. Run 'dynamic-comfyui start' from the Jupyter terminal. ({exc})")
+            print_warning(f"Failed to auto-start ComfyUI. Run 'dynamic-comfyui start' from the Jupyter terminal. ({exc})")
 
     while True:
         import time
@@ -348,7 +395,7 @@ def cmd_install(ctx: RuntimeContext) -> None:
 
 def _save_selected_project(network_volume: Path, manifest_path: Path, source_url: str) -> None:
     save_project_state(network_volume, "active-project", manifest_path, source_url)
-    print("Selected project: active-project")
+    print_success("Selected project: active-project")
 
 
 def cmd_start(ctx: RuntimeContext, project_url: str | None = None) -> None:
@@ -374,10 +421,10 @@ def cmd_install_deps(ctx: RuntimeContext, project_urls: list[str] | None = None)
     if detected_comfyui is not None:
         detected_volume = detected_comfyui.parent
         if detected_volume != network_volume:
-            print(f"Detected ComfyUI workspace at {detected_comfyui}. Using {detected_volume} as workspace root.")
+            print_info(f"Detected ComfyUI workspace at {detected_comfyui}. Using {detected_volume} as workspace root.")
         network_volume = detected_volume
     else:
-        print(f"Could not auto-detect ComfyUI workspace. Using configured workspace root: {network_volume}")
+        print_warning(f"Could not auto-detect ComfyUI workspace. Using configured workspace root: {network_volume}")
 
     if not project_urls:
         manifest_path, source_url = prompt_and_prepare_project_manifest(network_volume)
@@ -397,8 +444,7 @@ def cmd_install_deps(ctx: RuntimeContext, project_urls: list[str] | None = None)
     shared_default_manifest_path = resolve_default_manifest(ctx.package_json_path, shared_manifest_temp_dir)
     for index, project_url in enumerate(project_urls, start=1):
         manifest_path, source_url = prepare_project_manifest(network_volume, project_url)
-        blue_source_url = f"\033[34m{source_url}\033[0m"
-        print(f"Installing dependencies for project [{index}/{total}]: {blue_source_url}")
+        print_info(f"Installing dependencies for project [{index}/{total}]: [url]{source_url}[/]")
         _save_selected_project(network_volume, manifest_path, source_url)
         try:
             run_dependency_install_flow(
@@ -412,7 +458,7 @@ def cmd_install_deps(ctx: RuntimeContext, project_urls: list[str] | None = None)
             comfyui_dir, _ = ensure_comfyui_workspace(network_volume)
             mark_failed(None, comfyui_dir, f"Dependency installation failed. {exc}")
             raise
-    print("Dependency installation complete.")
+    print_success("Dependency installation complete.")
     _print_comfyui_link()
 
 
@@ -441,16 +487,13 @@ def cmd_start_new_project(ctx: RuntimeContext) -> None:
     manifest_path, source_url = prompt_and_prepare_project_manifest(network_volume)
     cleanup_previous = False
     if previous_source and previous_source != source_url:
-        print(f"Previous project: {previous_key or 'active-project'}")
-        print("Selected project: active-project")
+        print_info(f"Previous project: {previous_key or 'active-project'}")
+        print_info("Selected project: active-project")
         while True:
-            answer = input("Remove resources from previous project? (y/n): ").strip().lower()
-            if answer in {"y", "yes"}:
+            if prompt_confirm("Remove resources from previous project?", default=False):
                 cleanup_previous = True
                 break
-            if answer in {"n", "no"}:
-                break
-            print("Invalid choice. Enter 'y' or 'n'.")
+            break
 
     _save_selected_project(network_volume, manifest_path, source_url)
     run_comfyui_install_flow(ctx, manifest_path)
@@ -488,10 +531,10 @@ def cmd_update_nodes_and_models(ctx: RuntimeContext) -> None:
     if detected_comfyui is not None:
         detected_volume = detected_comfyui.parent
         if detected_volume != network_volume:
-            print(f"Detected ComfyUI workspace at {detected_comfyui}. Using {detected_volume} as workspace root.")
+            print_info(f"Detected ComfyUI workspace at {detected_comfyui}. Using {detected_volume} as workspace root.")
         network_volume = detected_volume
     else:
-        print(f"Could not auto-detect ComfyUI workspace. Using configured workspace root: {network_volume}")
+        print_warning(f"Could not auto-detect ComfyUI workspace. Using configured workspace root: {network_volume}")
 
     key, _saved_manifest_path, source_url = load_project_state(network_volume)
     manifest_path = active_project_manifest_path(network_volume)
@@ -515,18 +558,18 @@ def cmd_restart(ctx: RuntimeContext) -> None:
     if detected_comfyui is not None:
         detected_volume = detected_comfyui.parent
         if detected_volume != network_volume:
-            print(f"Detected ComfyUI workspace at {detected_comfyui}. Using {detected_volume} as workspace root.")
+            print_info(f"Detected ComfyUI workspace at {detected_comfyui}. Using {detected_volume} as workspace root.")
         network_volume = detected_volume
         comfyui_dir = detected_comfyui
     else:
-        print(f"Could not auto-detect ComfyUI workspace. Using configured workspace root: {network_volume}")
+        print_warning(f"Could not auto-detect ComfyUI workspace. Using configured workspace root: {network_volume}")
         comfyui_dir, _ = ensure_comfyui_workspace(network_volume)
 
-    print("Restarting ComfyUI...")
+    print_rule("Restart ComfyUI")
     startup_lines = start_comfyui_service_for_restart(comfyui_dir, network_volume)
     for line in startup_lines:
-        print(line)
-    print("ComfyUI restart complete.")
+        print_info(line)
+    print_success("ComfyUI restart complete.")
 
 
 def cmd_stop(ctx: RuntimeContext) -> None:
@@ -536,16 +579,16 @@ def cmd_stop(ctx: RuntimeContext) -> None:
     if detected_comfyui is not None:
         detected_volume = detected_comfyui.parent
         if detected_volume != network_volume:
-            print(f"Detected ComfyUI workspace at {detected_comfyui}. Using {detected_volume} as workspace root.")
+            print_info(f"Detected ComfyUI workspace at {detected_comfyui}. Using {detected_volume} as workspace root.")
         network_volume = detected_volume
         comfyui_dir = detected_comfyui
     else:
-        print(f"Could not auto-detect ComfyUI workspace. Using configured workspace root: {network_volume}")
+        print_warning(f"Could not auto-detect ComfyUI workspace. Using configured workspace root: {network_volume}")
         comfyui_dir, _ = ensure_comfyui_workspace(network_volume)
 
-    print("Stopping ComfyUI...")
+    print_rule("Stop ComfyUI")
     stop_comfyui_service(comfyui_dir)
-    print("ComfyUI stop complete.")
+    print_success("ComfyUI stop complete.")
 
 
 def cmd_update_dc(_ctx: RuntimeContext) -> None:

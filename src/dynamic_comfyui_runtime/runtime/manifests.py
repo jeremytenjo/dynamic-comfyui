@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .common import download_file, ensure_dir, find_file_upwards, normalize_github_blob_url, read_json
+from .ui import print_info, print_warning
 
 
 DEFAULT_RESOURCES_URL = normalize_github_blob_url(
@@ -139,7 +140,7 @@ def _parse_manifest(path: Path) -> ManifestData:
             validate_manifest_url(project_url)
         except Exception as exc:
             red_project_url = f"\033[31m'{project_url}'\033[0m"
-            print(f"⚠️ Warning: skipping invalid import_projects[{idx}].project_url {red_project_url} ({exc})")
+            print_warning(f"Warning: skipping invalid import_projects[{idx}].project_url {red_project_url} ({exc})")
             continue
         import_projects.append(ImportProject(project_url=project_url))
 
@@ -203,15 +204,15 @@ def resolve_default_manifest(package_json_path: Path, temp_dir: Path) -> Path:
             download_file(default_url, candidate)
             if candidate.is_file() and candidate.stat().st_size > 0:
                 blue_default_url = f"\033[34m{default_url}\033[0m"
-                print(f"Loaded remote default resources manifest: {blue_default_url}")
+                print_info(f"Loaded remote default resources manifest: {blue_default_url}")
                 return candidate
         except Exception as exc:
-            print(f"Warning: failed to download remote default resources manifest: {default_url} ({exc})")
+            print_warning(f"Warning: failed to download remote default resources manifest: {default_url} ({exc})")
     local_manifest = _local_default_manifest_path(package_json_path)
     if local_manifest is not None:
-        print(f"Loaded local default resources manifest: {local_manifest}")
+        print_info(f"Loaded local default resources manifest: {local_manifest}")
         return local_manifest
-    print("Warning: no default resources manifest available; continuing with project resources only.")
+    print_warning("Warning: no default resources manifest available; continuing with project resources only.")
     empty = temp_dir / "default-resources-empty.json"
     empty.write_text('{"custom_nodes": [], "files": []}\n', encoding="utf-8")
     return empty
@@ -225,7 +226,7 @@ def _resolve_imported_manifests(root: ManifestData, temp_dir: Path) -> list[Mani
     def _resolve(url: str) -> list[ManifestData]:
         normalized = normalize_manifest_url(url)
         if normalized in visiting:
-            print(f"Warning: skipping cyclic imported project manifest: {normalized}")
+            print_warning(f"Warning: skipping cyclic imported project manifest: {normalized}")
             return []
         if normalized in visited:
             return []
@@ -236,7 +237,7 @@ def _resolve_imported_manifests(root: ManifestData, temp_dir: Path) -> list[Mani
             download_manifest(normalized, candidate)
             parsed = _parse_manifest(candidate)
         except Exception as exc:
-            print(f"Warning: failed to import project manifest {normalized} ({exc})")
+            print_warning(f"Warning: failed to import project manifest {normalized} ({exc})")
             visiting.remove(normalized)
             return []
 

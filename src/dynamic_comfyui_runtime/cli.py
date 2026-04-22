@@ -4,6 +4,7 @@ import argparse
 import os
 from pathlib import Path
 
+from .runtime.ui import print_error, setup_rich_runtime
 from .runtime.operations import (
     RuntimeContext,
     cmd_add_project,
@@ -127,6 +128,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> None:
+    setup_rich_runtime()
     parser = build_parser()
     args = parser.parse_args()
 
@@ -164,7 +166,7 @@ def main() -> None:
         else:
             handlers[args.command](ctx)
     except Exception as exc:
-        print(f"Error: {exc}")
+        print_error(f"Error: {exc}")
         raise SystemExit(1) from exc
 
 

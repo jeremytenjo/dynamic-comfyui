@@ -7,6 +7,8 @@ import subprocess
 import sys
 from urllib.request import Request, urlopen
 
+from .ui import print_info, print_success, print_warning, status
+
 LATEST_RELEASE_API_URL = "https://api.github.com/repos/jeremytenjo/dynamic-comfyui/releases/latest"
 REEXEC_FLAG = "DYNAMIC_COMFYUI_RUNTIME_REEXECED"
 
@@ -36,30 +38,31 @@ def resolve_latest_runtime_wheel_url() -> str:
 
 
 def upgrade_runtime_package() -> bool:
-    print("Updating dynamic-comfyui runtime package to latest release...")
+    print_info("Updating dynamic-comfyui runtime package to latest release...")
     try:
-        wheel_url = resolve_latest_runtime_wheel_url()
+        with status("Resolving latest runtime wheel..."):
+            wheel_url = resolve_latest_runtime_wheel_url()
     except Exception as exc:
-        print(f"Warning: could not resolve latest runtime wheel URL: {exc}")
+        print_warning(f"Warning: could not resolve latest runtime wheel URL: {exc}")
         return False
 
     install = subprocess.run(
         [sys.executable, "-m", "pip", "install", "--no-cache-dir", "--upgrade", wheel_url]
     )
     if install.returncode != 0:
-        print("Warning: failed to update runtime package from GitHub Releases.")
+        print_warning("Warning: failed to update runtime package from GitHub Releases.")
         return False
-    print("Runtime package update complete.")
+    print_success("Runtime package update complete.")
     return True
 
 
 def uninstall_runtime_package() -> bool:
-    print("Uninstalling dynamic-comfyui runtime package...")
+    print_info("Uninstalling dynamic-comfyui runtime package...")
     uninstall = subprocess.run([sys.executable, "-m", "pip", "uninstall", "-y", "dynamic-comfyui-runtime"])
     if uninstall.returncode != 0:
-        print("Warning: failed to uninstall dynamic-comfyui-runtime package.")
+        print_warning("Warning: failed to uninstall dynamic-comfyui-runtime package.")
         return False
-    print("Runtime package uninstall complete.")
+    print_success("Runtime package uninstall complete.")
     return True
 
 
