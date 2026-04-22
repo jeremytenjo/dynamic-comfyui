@@ -166,10 +166,15 @@ def prepare_project_manifest(network_volume: Path, source_url: str) -> tuple[Pat
     return manifest_path, normalized
 
 
-def _load_manifest_context(ctx: RuntimeContext, project_manifest_path: Path) -> tuple[MergedManifest, str | None]:
+def _load_manifest_context(
+    ctx: RuntimeContext,
+    project_manifest_path: Path,
+    *,
+    default_manifest_path: Path | None = None,
+) -> tuple[MergedManifest, str | None]:
     temp_dir = Path(tempfile.mkdtemp(prefix="dynamic-comfyui-install-manifest-"))
-    default_manifest_path = resolve_default_manifest(ctx.package_json_path, temp_dir)
-    merged = merge_manifests(project_manifest_path, default_manifest_path, temp_dir=temp_dir)
+    resolved_default_manifest = default_manifest_path or resolve_default_manifest(ctx.package_json_path, temp_dir)
+    merged = merge_manifests(project_manifest_path, resolved_default_manifest, temp_dir=temp_dir)
 
     hf_token: str | None = None
     if project_requires_hf_token(project_manifest_path):
@@ -217,14 +222,22 @@ def _print_comfyui_link() -> None:
 
 
 def _execute_dependency_install(
-    ctx: RuntimeContext, project_manifest_path: Path, *, manager_quiet: bool
+    ctx: RuntimeContext,
+    project_manifest_path: Path,
+    *,
+    manager_quiet: bool,
+    default_manifest_path: Path | None = None,
 ) -> InstallExecution:
     network_volume = set_network_volume_default(ctx.network_volume)
     comfyui_dir, custom_nodes_dir = ensure_comfyui_workspace(network_volume)
     set_model_directories(comfyui_dir)
     require_tools(["python3", "git"])
 
-    merged, hf_token = _load_manifest_context(ctx, project_manifest_path)
+    merged, hf_token = _load_manifest_context(
+        ctx,
+        project_manifest_path,
+        default_manifest_path=default_manifest_path,
+    )
     mark_running(merged, comfyui_dir)
 
     print("Ensuring ComfyUI core workspace is installed...")
@@ -274,9 +287,21 @@ def run_comfyui_install_flow(ctx: RuntimeContext, project_manifest_path: Path) -
         print(line)
 
 
-def run_dependency_install_flow(ctx: RuntimeContext, project_manifest_path: Path) -> None:
+def run_dependency_install_flow(
+    ctx: RuntimeContext,
+    project_manifest_path: Path,
+    *,
+    default_manifest_path: Path | None = None,
+    show_completion: bool = True,
+    show_comfyui_link: bool = True,
+) -> None:
     ctx.install_start_ts = now_epoch()
-    execution = _execute_dependency_install(ctx, project_manifest_path, manager_quiet=True)
+    execution = _execute_dependency_install(
+        ctx,
+        project_manifest_path,
+        manager_quiet=True,
+        default_manifest_path=default_manifest_path,
+    )
 
     mark_done(execution.merged, execution.comfyui_dir)
     _print_resource_summary(
@@ -286,8 +311,10 @@ def run_dependency_install_flow(ctx: RuntimeContext, project_manifest_path: Path
         execution.node_failures,
         execution.file_failures,
     )
-    print("Dependency installation complete.")
-    _print_comfyui_link()
+    if show_completion:
+        print("Dependency installation complete.")
+    if show_comfyui_link:
+        _print_comfyui_link()
 
 
 def cmd_install(ctx: RuntimeContext) -> None:
@@ -366,17 +393,27 @@ def cmd_install_deps(ctx: RuntimeContext, project_urls: list[str] | None = None)
 
     total = len(project_urls)
     ctx.network_volume = network_volume
+    shared_manifest_temp_dir = Path(tempfile.mkdtemp(prefix="dynamic-comfyui-install-default-manifest-"))
+    shared_default_manifest_path = resolve_default_manifest(ctx.package_json_path, shared_manifest_temp_dir)
     for index, project_url in enumerate(project_urls, start=1):
         manifest_path, source_url = prepare_project_manifest(network_volume, project_url)
         blue_source_url = f"\033[34m{source_url}\033[0m"
         print(f"Installing dependencies for project [{index}/{total}]: {blue_source_url}")
         _save_selected_project(network_volume, manifest_path, source_url)
         try:
-            run_dependency_install_flow(ctx, manifest_path)
+            run_dependency_install_flow(
+                ctx,
+                manifest_path,
+                default_manifest_path=shared_default_manifest_path,
+                show_completion=False,
+                show_comfyui_link=False,
+            )
         except Exception as exc:
             comfyui_dir, _ = ensure_comfyui_workspace(network_volume)
             mark_failed(None, comfyui_dir, f"Dependency installation failed. {exc}")
             raise
+    print("Dependency installation complete.")
+    _print_comfyui_link()
 
 
 def _snapshot_previous_manifest(network_volume: Path) -> tuple[str, str, Path | None]:
