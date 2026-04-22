@@ -368,7 +368,8 @@ def cmd_install_deps(ctx: RuntimeContext, project_urls: list[str] | None = None)
     ctx.network_volume = network_volume
     for index, project_url in enumerate(project_urls, start=1):
         manifest_path, source_url = prepare_project_manifest(network_volume, project_url)
-        print(f"Installing dependencies for project [{index}/{total}]: {source_url}")
+        blue_source_url = f"\033[34m{source_url}\033[0m"
+        print(f"Installing dependencies for project [{index}/{total}]: {blue_source_url}")
         _save_selected_project(network_volume, manifest_path, source_url)
         try:
             run_dependency_install_flow(ctx, manifest_path)
