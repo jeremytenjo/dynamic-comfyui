@@ -24,18 +24,36 @@ def run(
     timeout: int | None = None,
     input_text: str | None = None,
 ) -> subprocess.CompletedProcess[str]:
-    kwargs: dict[str, object] = {"cwd": str(cwd) if cwd else None, "text": True}
-    if quiet:
-        kwargs["stdout"] = subprocess.PIPE
-        kwargs["stderr"] = subprocess.PIPE
+    kwargs: dict[str, object] = {
+        "cwd": str(cwd) if cwd else None,
+        "text": True,
+        "stdout": subprocess.PIPE,
+        "stderr": subprocess.PIPE,
+    }
     if input_text is not None:
         kwargs["input"] = input_text
     try:
         completed = subprocess.run(cmd, timeout=timeout, **kwargs)  # noqa: S603
     except subprocess.TimeoutExpired as exc:
-        raise RuntimeError(f"Command timed out after {timeout}s: {' '.join(cmd)}") from exc
+        stdout_tail = (exc.stdout or "").strip()
+        stderr_tail = (exc.stderr or "").strip()
+        details: list[str] = []
+        if stdout_tail:
+            details.append(f"stdout: {stdout_tail[-600:]}")
+        if stderr_tail:
+            details.append(f"stderr: {stderr_tail[-600:]}")
+        suffix = f" ({'; '.join(details)})" if details else ""
+        raise RuntimeError(f"Command timed out after {timeout}s: {' '.join(cmd)}{suffix}") from exc
     if check and completed.returncode != 0:
-        raise RuntimeError(f"Command failed ({completed.returncode}): {' '.join(cmd)}")
+        stdout_tail = (completed.stdout or "").strip()
+        stderr_tail = (completed.stderr or "").strip()
+        details: list[str] = []
+        if stdout_tail:
+            details.append(f"stdout: {stdout_tail[-600:]}")
+        if stderr_tail:
+            details.append(f"stderr: {stderr_tail[-600:]}")
+        suffix = f" ({'; '.join(details)})" if details else ""
+        raise RuntimeError(f"Command failed ({completed.returncode}): {' '.join(cmd)}{suffix}")
     return completed
 
 
