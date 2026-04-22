@@ -263,17 +263,17 @@ def _print_resource_summary(
 
     nodes_table = Table()
     nodes_table.add_column("Custom Nodes", overflow="fold")
-    nodes_table.add_column("Source")
+    nodes_table.add_column("Source", overflow="fold")
     nodes_table.add_column("Status")
     if merged.default_custom_nodes or merged.project_custom_nodes:
-        for source, specs in (("default", merged.default_custom_nodes), ("project", merged.project_custom_nodes)):
+        for specs in (merged.default_custom_nodes, merged.project_custom_nodes):
             for node in specs:
                 exists = (custom_nodes_dir / node.repo_dir).is_dir()
                 if node.repo_dir in failure_nodes:
                     status = "failed"
                 else:
                     status = "installed" if exists else "missing on disk"
-                nodes_table.add_row(node.repo_dir, source, status)
+                nodes_table.add_row(node.repo_dir, node.repo, status)
     else:
         nodes_table.add_row("(none)", "-", "-")
     console().print(nodes_table)
