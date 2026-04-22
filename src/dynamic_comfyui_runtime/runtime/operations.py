@@ -6,7 +6,7 @@ from pathlib import Path
 
 from rich.table import Table
 
-from .common import ensure_dir, now_epoch, require_tools, utc_timestamp
+from .common import ensure_dir, format_size_for_display, now_epoch, require_tools, utc_timestamp
 from .installer import (
     FileInstallFailure,
     NodeInstallFailure,
@@ -228,6 +228,11 @@ def _print_resource_summary(
     print_rule("Summary")
     tables: list[Table] = []
 
+    def _installed_file_size_label(path: Path) -> str:
+        if not path.is_file():
+            return "-"
+        return format_size_for_display(path.stat().st_size)
+
     nodes_default = Table()
     nodes_default.add_column("Custom Nodes (default resources)")
     nodes_default.add_column("Status")
@@ -252,24 +257,36 @@ def _print_resource_summary(
 
     files_default = Table()
     files_default.add_column("Files (default resources)", overflow="fold")
+    files_default.add_column("Size", justify="right")
     files_default.add_column("Status")
     if merged.default_files:
         for spec in merged.default_files:
-            exists = (comfyui_dir / spec.target).is_file()
-            files_default.add_row(spec.target, "installed" if exists else "missing on disk")
+            file_path = comfyui_dir / spec.target
+            exists = file_path.is_file()
+            files_default.add_row(
+                spec.target,
+                _installed_file_size_label(file_path),
+                "installed" if exists else "missing on disk",
+            )
     else:
-        files_default.add_row("(none)", "-")
+        files_default.add_row("(none)", "-", "-")
     tables.append(files_default)
 
     files_project = Table()
     files_project.add_column("Files (project manifest)", overflow="fold")
+    files_project.add_column("Size", justify="right")
     files_project.add_column("Status")
     if merged.project_files:
         for spec in merged.project_files:
-            exists = (comfyui_dir / spec.target).is_file()
-            files_project.add_row(spec.target, "installed" if exists else "missing on disk")
+            file_path = comfyui_dir / spec.target
+            exists = file_path.is_file()
+            files_project.add_row(
+                spec.target,
+                _installed_file_size_label(file_path),
+                "installed" if exists else "missing on disk",
+            )
     else:
-        files_project.add_row("(none)", "-")
+        files_project.add_row("(none)", "-", "-")
     tables.append(files_project)
 
     for table in tables:
