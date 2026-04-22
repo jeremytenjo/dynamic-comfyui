@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import shutil
-import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
 import re
 from threading import Lock
+
+from rich.progress import BarColumn, DownloadColumn, Progress, TaskID, TextColumn, TimeElapsedColumn, TransferSpeedColumn
 
 from .common import download_file, format_size_for_display, probe_remote_file_size, run
 from .manifests import CustomNode, FileSpec
@@ -140,7 +141,7 @@ def install_files(
     def _colorize_urls_red(text: str) -> str:
         return url_pattern.sub(lambda m: f"\033[31m{m.group(0)}\033[0m", text)
 
-    def _process_file(file_spec: FileSpec) -> FileInstallFailure | None:
+    def _process_file(file_spec: FileSpec, progress: Progress, task_id: TaskID) -> FileInstallFailure | None:
         nonlocal reserved_known_bytes
         target_path = comfyui_dir / file_spec.target
         if target_path.is_file():
@@ -161,56 +162,40 @@ def install_files(
                     reserved_known_bytes += known_size
                     reserved_size = known_size
 
-            last_percent_bucket = -1
-            last_unknown_report_mb = -1
-            last_reported_bytes = 0
-            last_report_ts = time.monotonic()
+            last_progress_bytes = 0
 
             def _on_download_progress(downloaded: int, total_size: int | None) -> None:
-                nonlocal last_percent_bucket, last_unknown_report_mb, last_reported_bytes, last_report_ts
+                nonlocal last_progress_bytes
                 with progress_lock:
-                    if total_size and total_size > 0:
-                        percent = int((downloaded * 100) / total_size)
-                        bucket = min(percent // 10, 10)
-                        now = time.monotonic()
-                        progressed_bytes = downloaded - last_reported_bytes
-                        should_print = False
-                        if bucket > last_percent_bucket:
-                            last_percent_bucket = bucket
-                            should_print = True
-                        elif progressed_bytes >= 256 * 1024 * 1024:
-                            should_print = True
-                        elif progressed_bytes > 0 and (now - last_report_ts) >= 20:
-                            should_print = True
-                        if not should_print:
-                            return
-                        print(
-                            f"  Downloading {file_spec.target}: {percent}% "
-                            f"({format_size_for_display(downloaded)}/{format_size_for_display(total_size)})"
-                        )
-                        last_reported_bytes = downloaded
-                        last_report_ts = now
-                        return
-
-                    downloaded_mb = downloaded // (1024 * 1024)
-                    report_bucket = downloaded_mb // 25
-                    if report_bucket <= last_unknown_report_mb:
-                        return
-                    last_unknown_report_mb = report_bucket
-                    print(f"  Downloading {file_spec.target}: {format_size_for_display(downloaded)}")
+                    total = total_size if total_size and total_size > 0 else None
+                    if total is not None:
+                        progress.update(task_id, total=total)
+                    delta = downloaded - last_progress_bytes
+                    if delta > 0:
+                        progress.advance(task_id, delta)
+                        last_progress_bytes = downloaded
 
             download_file(file_spec.url, target_path, hf_token=hf_token, on_progress=_on_download_progress)
         except Exception as exc:
             return FileInstallFailure(target=file_spec.target, error=str(exc))
         finally:
+            with progress_lock:
+                progress.stop_task(task_id)
             if reserved_size > 0:
                 with reservation_lock:
                     reserved_known_bytes = max(reserved_known_bytes - reserved_size, 0)
         return None
 
     failures: list[FileInstallFailure] = []
-    futures = {}
-    with ThreadPoolExecutor(max_workers=5) as executor:
+    futures: dict = {}
+    with Progress(
+        TextColumn("{task.description}"),
+        BarColumn(),
+        DownloadColumn(),
+        TransferSpeedColumn(),
+        TimeElapsedColumn(),
+        transient=True,
+    ) as progress, ThreadPoolExecutor(max_workers=5) as executor:
         for idx, file_spec in enumerate(files, start=1):
             target_path = comfyui_dir / file_spec.target
             print(f"[{idx}/{len(files)}] Processing {file_spec.target}")
@@ -219,21 +204,28 @@ def install_files(
                 if on_progress:
                     on_progress()
                 continue
-            futures[executor.submit(_process_file, file_spec)] = file_spec
+            initial_total = known_sizes_by_target.get(file_spec.target)
+            task_id = progress.add_task(
+                f"Downloading {file_spec.target}",
+                total=initial_total if initial_total and initial_total > 0 else None,
+            )
+            futures[executor.submit(_process_file, file_spec, progress, task_id)] = (file_spec, task_id)
 
         total_downloads = len(futures)
         completed_downloads = 0
         for future in as_completed(futures):
-            file_spec = futures[future]
+            file_spec, task_id = futures[future]
             completed_downloads += 1
             remaining_downloads = total_downloads - completed_downloads
             blue_remaining = f"\033[34m(remaining {remaining_downloads})\033[0m"
             failure = future.result()
             if failure is not None:
                 failures.append(failure)
+                progress.update(task_id, visible=False)
                 print(f"❌ Failed to download {file_spec.target}: {_colorize_urls_red(failure.error)}")
                 print(f"Download progress: {blue_remaining}")
             else:
+                progress.update(task_id, visible=False)
                 print(f"✅ Downloaded {file_spec.target} {blue_remaining}")
             if on_progress:
                 on_progress()

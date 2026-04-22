@@ -12,6 +12,9 @@ license = { text = "MIT" }
 authors = [
   { name = "Jeremy Tenjo" }
 ]
+dependencies = [
+  "rich>=13.7.0"
+]
 
 [project.scripts]
 dynamic-comfyui = "dynamic_comfyui_runtime.cli:main"
