@@ -16,7 +16,7 @@ from rich.traceback import install as install_rich_traceback
 _THEME = Theme(
     {
         "info": "default",
-        "success": "default",
+        "success": "green",
         "warning": "yellow",
         "error": "bold red",
         "muted": "default",
