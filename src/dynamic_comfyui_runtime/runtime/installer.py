@@ -100,12 +100,14 @@ def install_files(
     if files_to_download:
         print("Checking available storage for pending downloads...")
         required_known_bytes = 0
+        known_sizes_by_target: dict[str, int] = {}
         unknown_size_targets: list[str] = []
         for file_spec in files_to_download:
             size = probe_remote_file_size(file_spec.url, hf_token=hf_token)
             if size is None:
                 unknown_size_targets.append(file_spec.target)
                 continue
+            known_sizes_by_target[file_spec.target] = size
             required_known_bytes += size
 
         free_bytes = shutil.disk_usage(comfyui_dir).free
@@ -127,18 +129,38 @@ def install_files(
             )
             for target in unknown_size_targets:
                 print(f" - {target}")
+    else:
+        known_sizes_by_target = {}
 
     progress_lock = Lock()
+    reservation_lock = Lock()
+    reserved_known_bytes = 0
     url_pattern = re.compile(r"https?://\S+")
 
     def _colorize_urls_red(text: str) -> str:
         return url_pattern.sub(lambda m: f"\033[31m{m.group(0)}\033[0m", text)
 
     def _process_file(file_spec: FileSpec) -> FileInstallFailure | None:
+        nonlocal reserved_known_bytes
         target_path = comfyui_dir / file_spec.target
         if target_path.is_file():
             return None
+        known_size = known_sizes_by_target.get(file_spec.target)
+        reserved_size = 0
         try:
+            if known_size is not None and known_size > 0:
+                with reservation_lock:
+                    free_bytes_now = shutil.disk_usage(comfyui_dir).free
+                    available_bytes = free_bytes_now - reserved_known_bytes
+                    if known_size > available_bytes:
+                        raise RuntimeError(
+                            "Insufficient storage before starting download. "
+                            f"Need {format_size_for_display(known_size)} for {file_spec.target}, "
+                            f"available now: {format_size_for_display(max(available_bytes, 0))}."
+                        )
+                    reserved_known_bytes += known_size
+                    reserved_size = known_size
+
             last_percent_bucket = -1
             last_unknown_report_mb = -1
             last_reported_bytes = 0
@@ -180,6 +202,10 @@ def install_files(
             download_file(file_spec.url, target_path, hf_token=hf_token, on_progress=_on_download_progress)
         except Exception as exc:
             return FileInstallFailure(target=file_spec.target, error=str(exc))
+        finally:
+            if reserved_size > 0:
+                with reservation_lock:
+                    reserved_known_bytes = max(reserved_known_bytes - reserved_size, 0)
         return None
 
     failures: list[FileInstallFailure] = []

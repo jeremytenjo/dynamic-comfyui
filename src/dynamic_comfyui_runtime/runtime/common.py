@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import errno
 import json
 import os
 import shutil
@@ -9,7 +10,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
-from typing import Iterable
+from typing import BinaryIO, Iterable
 
 
 def run(
@@ -122,6 +123,12 @@ def download_file(
             downloaded = 0
             chunk_size = 1024 * 1024
             with target.open("wb") as out_file:
+                if total_size and total_size > 0:
+                    print(
+                        f"Preallocating {target}: {format_size_for_display(total_size)} "
+                        "(fail-fast storage check)"
+                    )
+                    _preallocate_download_target(url, target, out_file, total_size)
                 while True:
                     chunk = resp.read(chunk_size)
                     if not chunk:
@@ -131,9 +138,37 @@ def download_file(
                     if on_progress:
                         on_progress(downloaded, total_size)
     except urllib.error.HTTPError as exc:
+        target.unlink(missing_ok=True)
         raise RuntimeError(f"Download failed ({exc.code}) for {url}") from exc
     except urllib.error.URLError as exc:
+        target.unlink(missing_ok=True)
         raise RuntimeError(f"Download failed for {url}: {exc.reason}") from exc
+    except OSError as exc:
+        target.unlink(missing_ok=True)
+        reason = exc.strerror or str(exc)
+        raise RuntimeError(f"Download failed for {url}: {reason}") from exc
+
+
+def _preallocate_download_target(url: str, target: Path, out_file: BinaryIO, total_size: int) -> None:
+    free_bytes = shutil.disk_usage(target.parent).free
+    if total_size > free_bytes:
+        raise RuntimeError(
+            "Insufficient storage before starting download. "
+            f"Need {format_size_for_display(total_size)} but only "
+            f"{format_size_for_display(free_bytes)} is available for {url}"
+        )
+    if not hasattr(os, "posix_fallocate"):
+        return
+    try:
+        os.posix_fallocate(out_file.fileno(), 0, total_size)
+        out_file.seek(0)
+    except OSError as exc:
+        if exc.errno in {errno.ENOSPC, errno.EDQUOT}:
+            raise RuntimeError(
+                "Insufficient storage before starting download. "
+                f"Need {format_size_for_display(total_size)} for {url}"
+            ) from exc
+        raise
 
 
 def probe_remote_file_size(url: str, *, hf_token: str | None = None) -> int | None:
