@@ -37,7 +37,7 @@ def install_custom_nodes(
     failures: list[NodeInstallFailure] = []
     with Progress(
         TextColumn("{task.description}"),
-        BarColumn(style="blue", complete_style="blue", finished_style="blue", pulse_style="blue"),
+        BarColumn(style="grey50", complete_style="blue", finished_style="blue", pulse_style="blue"),
         TextColumn("{task.completed:.0f}/{task.total:.0f}"),
         TextColumn("{task.fields[stage]}"),
         transient=is_interactive_terminal(),
@@ -247,7 +247,7 @@ def install_files(
     futures: dict = {}
     with Progress(
         TextColumn("{task.description}"),
-        BarColumn(style="blue", complete_style="blue", finished_style="blue", pulse_style="blue"),
+        BarColumn(style="grey50", complete_style="blue", finished_style="blue", pulse_style="blue"),
         DownloadColumn(),
         transient=is_interactive_terminal(),
     ) as progress, ThreadPoolExecutor(max_workers=5) as executor:
