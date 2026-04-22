@@ -119,13 +119,9 @@ def install_files(
             preflight_rows.append((file_spec.target, format_size_for_display(size)))
 
         free_bytes = effective_free_bytes(comfyui_dir)
-        print_info(
-            "Storage preflight: "
-            f"known required={format_size_for_display(required_known_bytes)}, "
-            f"available={format_size_for_display(free_bytes)}"
-        )
-        preflight_table = Table(title="Download Preflight", show_lines=False)
-        preflight_table.add_column("Target", overflow="fold")
+        print_info(f"Storage preflight: known required={format_size_for_display(required_known_bytes)}")
+        preflight_table = Table(show_lines=False)
+        preflight_table.add_column("Download Preflight", overflow="fold")
         preflight_table.add_column("Remote Size", justify="right")
         for target, remote_size in preflight_rows:
             preflight_table.add_row(target, remote_size)
