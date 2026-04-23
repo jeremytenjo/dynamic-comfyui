@@ -441,13 +441,17 @@ def _print_resource_summary(
     files_table = Table()
     files_table.add_column("Files", overflow="fold")
     files_table.add_column("Source", overflow="fold")
-    files_table.add_column("Size", justify="right")
     files_table.add_column("Status")
+    files_table.add_column("Size", justify="right")
+    total_installed_bytes = 0
     if merged.default_files or merged.project_files:
         for specs in (merged.default_files, merged.project_files):
             for spec in specs:
                 file_path = comfyui_dir / spec.target
                 exists = file_path.is_file()
+                size_display = _installed_file_size_label(file_path)
+                if exists:
+                    total_installed_bytes += file_path.stat().st_size
                 failure = file_failure_map.get(spec.target)
                 if failure is not None:
                     status = f"[error]Failed: {failure.error}[/]"
@@ -456,9 +460,10 @@ def _print_resource_summary(
                 files_table.add_row(
                     spec.target,
                     spec.url,
-                    _installed_file_size_label(file_path),
                     status,
+                    size_display,
                 )
+        files_table.add_row("Total", "-", "-", f"[bold]{format_size_for_display(total_installed_bytes)}[/]")
     else:
         files_table.add_row("(none)", "-", "-", "-")
     console().print(files_table)
