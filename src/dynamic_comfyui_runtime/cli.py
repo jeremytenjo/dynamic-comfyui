@@ -10,6 +10,7 @@ from .runtime.operations import (
     cmd_add_project,
     cmd_install_deps,
     cmd_install,
+    cmd_remove_deps,
     cmd_replace_project,
     cmd_restart,
     cmd_stop,
@@ -62,6 +63,9 @@ def _help_text() -> str:
 - dc install-deps
   Install custom nodes/files only. Usage: dc install-deps [project_json_url ...]
 
+- dc remove-deps
+  Remove files only from project manifest URL(s). Usage: dc remove-deps [project_json_url ...]
+
 - dc start
   Enter a direct JSON URL (or press Enter for defaults-only) and install/start ComfyUI.
   Usage: dc start [project_json_url]
@@ -106,6 +110,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     for cmd in (
         "install",
+        "remove-deps",
         "start-new-project",
         "add-project",
         "replace-project",
@@ -124,6 +129,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     install_deps_parser = subparsers.add_parser("install-deps")
     install_deps_parser.add_argument("project_urls", nargs="*", default=None)
+
+    remove_deps_parser = subparsers.add_parser("remove-deps")
+    remove_deps_parser.add_argument("project_urls", nargs="*", default=None)
     return parser
 
 
@@ -146,6 +154,7 @@ def main() -> None:
     ctx = _context()
     handlers = {
         "install-deps": cmd_install_deps,
+        "remove-deps": cmd_remove_deps,
         "start": cmd_start,
         "start-new-project": cmd_start_new_project,
         "add-project": cmd_add_project,
@@ -161,6 +170,8 @@ def main() -> None:
     try:
         if args.command == "install-deps":
             cmd_install_deps(ctx, args.project_urls)
+        elif args.command == "remove-deps":
+            cmd_remove_deps(ctx, args.project_urls)
         elif args.command == "start":
             cmd_start(ctx, args.project_url)
         else:

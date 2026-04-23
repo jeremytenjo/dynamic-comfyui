@@ -19,6 +19,10 @@ Define project manifests (custom nodes + files) for repeatable ComfyUI setup on 
   ComfyUI workspace is auto-detected.
   This command does not start Jupyter or ComfyUI.
 
+- `dc remove-deps`
+  Remove files listed by project manifest URL(s) only.
+  Usage: `dc remove-deps <project-json-url> [project-json-url ...]` or `dc remove-deps` (prompts for URL).
+
 - `dc start`
   Enter a JSON URL (or press Enter for defaults-only), then install/start ComfyUI.
 

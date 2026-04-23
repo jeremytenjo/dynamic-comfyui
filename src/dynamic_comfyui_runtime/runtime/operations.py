@@ -111,6 +111,8 @@ Run this command in the terminal to update nodes and files (uses the last saved 
 
 Run this command in the terminal to install custom nodes/files only `dynamic-comfyui install-deps <project-json-url> [project-json-url ...]`
 
+Run this command in the terminal to remove files only from project manifest URL(s) `dynamic-comfyui remove-deps <project-json-url> [project-json-url ...]`
+
 Run this command in the terminal to update the dynamic-comfyui runtime package to latest `dynamic-comfyui update-dc`
 
 Run this command in the terminal to uninstall the dynamic-comfyui runtime package `dynamic-comfyui uninstall-dc`
@@ -661,6 +663,43 @@ def cmd_install_deps(ctx: RuntimeContext, project_urls: list[str] | None = None)
             raise
     print_success("Dependency installation complete.")
     _print_comfyui_link()
+
+
+def cmd_remove_deps(ctx: RuntimeContext, project_urls: list[str] | None = None) -> None:
+    configure_process_env()
+    network_volume = set_network_volume_default(ctx.network_volume)
+    detected_comfyui = discover_comfyui_workspace(network_volume)
+    if detected_comfyui is not None:
+        detected_volume = detected_comfyui.parent
+        if detected_volume != network_volume:
+            print_info(f"Detected ComfyUI workspace at {detected_comfyui}. Using {detected_volume} as workspace root.")
+        network_volume = detected_volume
+    else:
+        print_warning(f"Could not auto-detect ComfyUI workspace. Using configured workspace root: {network_volume}")
+
+    comfyui_dir, _custom_nodes_dir = ensure_comfyui_workspace(network_volume)
+
+    if not project_urls:
+        source_url = _prompt_manifest_url()
+        if not source_url:
+            raise RuntimeError("Project URL is required for remove-deps")
+        project_urls = [source_url]
+
+    total = len(project_urls)
+    for index, source_url in enumerate(project_urls, start=1):
+        normalized = normalize_manifest_url(source_url.strip())
+        validate_manifest_url(normalized)
+        manifest_path = Path(tempfile.mkstemp(prefix="dynamic-comfyui-remove-deps.", suffix=".json")[1])
+        download_manifest(normalized, manifest_path)
+        _node_dirs, file_targets = resources_for_cleanup(manifest_path)
+        print_info(f"Removing files for project [{index}/{total}]: [url]{normalized}[/]")
+        for target in file_targets:
+            file_path = comfyui_dir / target
+            if file_path.is_file():
+                print_info(f"Removing file: {target}")
+                file_path.unlink()
+
+    print_success("File removal complete.")
 
 
 def _snapshot_previous_manifest(network_volume: Path) -> tuple[str, str, Path | None]:
