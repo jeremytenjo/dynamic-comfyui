@@ -6,12 +6,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from threading import Lock
 
-from rich.progress import BarColumn, DownloadColumn, Progress, TaskID, TextColumn
 from rich.table import Table
 
 from .common import download_file, effective_free_bytes, format_size_for_display, probe_remote_file_size, run
 from .manifests import CustomNode, FileSpec
-from .ui import console, is_interactive_terminal, print_error, print_info, print_success, print_warning
+from .ui import console, print_error, print_info, print_success, print_warning
 
 
 @dataclass(frozen=True)
@@ -35,104 +34,71 @@ def install_custom_nodes(
         return []
 
     failures: list[NodeInstallFailure] = []
-    live_progress = bool(is_interactive_terminal() and console().is_terminal)
-    with Progress(
-        TextColumn("{task.description}"),
-        BarColumn(style="grey50", complete_style="blue", finished_style="blue", pulse_style="blue"),
-        TextColumn("{task.completed:.0f}/{task.total:.0f}"),
-        TextColumn("{task.fields[stage]}"),
-        transient=live_progress,
-        disable=not live_progress,
-    ) as progress:
-        overall_task_id = progress.add_task("Custom nodes", total=len(custom_nodes), stage="starting")
-        for node in custom_nodes:
-            node_path = custom_nodes_dir / node.repo_dir
-            node_task_id = progress.add_task(node.repo_dir, total=3, stage="queued")
-            if node_path.is_dir():
-                progress.update(node_task_id, completed=3, stage="already installed")
-                progress.advance(overall_task_id, 1)
-                progress.update(
-                    overall_task_id,
-                    stage=f"{int(progress.tasks[overall_task_id].completed)}/{len(custom_nodes)} complete",
-                )
-                if on_progress:
-                    on_progress()
-                continue
-
-            if node_path.exists():
-                shutil.rmtree(node_path)
-            try:
-                progress.update(node_task_id, stage="cloning")
-                run(["git", "clone", node.repo, str(node_path)], quiet=True)
-                progress.advance(node_task_id, 1)
-                progress.update(node_task_id, stage="clone complete")
-            except Exception as exc:
-                failures.append(NodeInstallFailure(repo_dir=node.repo_dir, step="git clone", error=str(exc)))
-                print_error(f"Failed to clone custom node {node.repo_dir}: {exc}")
-                progress.update(node_task_id, completed=3, stage="failed")
-                progress.advance(overall_task_id, 1)
-                progress.update(
-                    overall_task_id,
-                    stage=f"{int(progress.tasks[overall_task_id].completed)}/{len(custom_nodes)} complete",
-                )
-                if on_progress:
-                    on_progress()
-                continue
-
-            requirements = node_path / "requirements.txt"
-            if requirements.is_file():
-                try:
-                    progress.update(node_task_id, stage="installing requirements")
-                    run(["python3", "-m", "pip", "install", "--no-cache-dir", "-r", str(requirements)], quiet=True)
-                except Exception as exc:
-                    failures.append(NodeInstallFailure(repo_dir=node.repo_dir, step="requirements install", error=str(exc)))
-                    print_error(f"Failed to install requirements for {node.repo_dir}: {exc}")
-                    progress.update(node_task_id, completed=3, stage="failed")
-                    progress.advance(overall_task_id, 1)
-                    progress.update(
-                        overall_task_id,
-                        stage=f"{int(progress.tasks[overall_task_id].completed)}/{len(custom_nodes)} complete",
-                    )
-                    if on_progress:
-                        on_progress()
-                    continue
-                progress.advance(node_task_id, 1)
-                progress.update(node_task_id, stage="requirements complete")
-            else:
-                progress.advance(node_task_id, 1)
-                progress.update(node_task_id, stage="requirements skipped")
-
-            install_py = node_path / "install.py"
-            if install_py.is_file():
-                try:
-                    progress.update(node_task_id, stage="running install.py")
-                    run(["python3", "install.py"], cwd=node_path, quiet=True)
-                except Exception as exc:
-                    failures.append(NodeInstallFailure(repo_dir=node.repo_dir, step="install.py", error=str(exc)))
-                    print_error(f"Failed to run install.py for {node.repo_dir}: {exc}")
-                    progress.update(node_task_id, completed=3, stage="failed")
-                    progress.advance(overall_task_id, 1)
-                    progress.update(
-                        overall_task_id,
-                        stage=f"{int(progress.tasks[overall_task_id].completed)}/{len(custom_nodes)} complete",
-                    )
-                    if on_progress:
-                        on_progress()
-                    continue
-                progress.advance(node_task_id, 1)
-                progress.update(node_task_id, stage="install.py complete")
-            else:
-                progress.advance(node_task_id, 1)
-                progress.update(node_task_id, stage="install.py skipped")
-            progress.update(node_task_id, stage="done")
-            progress.advance(overall_task_id, 1)
-            progress.update(
-                overall_task_id,
-                stage=f"{int(progress.tasks[overall_task_id].completed)}/{len(custom_nodes)} complete",
-            )
-            print_success(f"Custom node ready: {node.repo_dir}")
+    total_nodes = len(custom_nodes)
+    completed_nodes = 0
+    for index, node in enumerate(custom_nodes, start=1):
+        node_prefix = f"[node {index}/{total_nodes}]"
+        node_path = custom_nodes_dir / node.repo_dir
+        if node_path.is_dir():
+            completed_nodes += 1
+            print_info(f"{node_prefix} {node.repo_dir}: already installed ({completed_nodes}/{total_nodes} complete)")
             if on_progress:
                 on_progress()
+            continue
+
+        if node_path.exists():
+            shutil.rmtree(node_path)
+        try:
+            print_info(f"{node_prefix} {node.repo_dir}: clone started")
+            run(["git", "clone", node.repo, str(node_path)], quiet=True)
+            print_info(f"{node_prefix} {node.repo_dir}: clone complete")
+        except Exception as exc:
+            failures.append(NodeInstallFailure(repo_dir=node.repo_dir, step="git clone", error=str(exc)))
+            completed_nodes += 1
+            print_error(f"{node_prefix} {node.repo_dir}: clone failed ({exc})")
+            print_info(f"Custom nodes progress: {completed_nodes}/{total_nodes} complete")
+            if on_progress:
+                on_progress()
+            continue
+
+        requirements = node_path / "requirements.txt"
+        if requirements.is_file():
+            try:
+                print_info(f"{node_prefix} {node.repo_dir}: requirements install started")
+                run(["python3", "-m", "pip", "install", "--no-cache-dir", "-r", str(requirements)], quiet=True)
+                print_info(f"{node_prefix} {node.repo_dir}: requirements install complete")
+            except Exception as exc:
+                failures.append(NodeInstallFailure(repo_dir=node.repo_dir, step="requirements install", error=str(exc)))
+                completed_nodes += 1
+                print_error(f"{node_prefix} {node.repo_dir}: requirements install failed ({exc})")
+                print_info(f"Custom nodes progress: {completed_nodes}/{total_nodes} complete")
+                if on_progress:
+                    on_progress()
+                continue
+        else:
+            print_info(f"{node_prefix} {node.repo_dir}: requirements skipped")
+
+        install_py = node_path / "install.py"
+        if install_py.is_file():
+            try:
+                print_info(f"{node_prefix} {node.repo_dir}: install.py started")
+                run(["python3", "install.py"], cwd=node_path, quiet=True)
+                print_info(f"{node_prefix} {node.repo_dir}: install.py complete")
+            except Exception as exc:
+                failures.append(NodeInstallFailure(repo_dir=node.repo_dir, step="install.py", error=str(exc)))
+                completed_nodes += 1
+                print_error(f"{node_prefix} {node.repo_dir}: install.py failed ({exc})")
+                print_info(f"Custom nodes progress: {completed_nodes}/{total_nodes} complete")
+                if on_progress:
+                    on_progress()
+                continue
+        else:
+            print_info(f"{node_prefix} {node.repo_dir}: install.py skipped")
+
+        completed_nodes += 1
+        print_success(f"{node_prefix} {node.repo_dir}: ready ({completed_nodes}/{total_nodes} complete)")
+        if on_progress:
+            on_progress()
     return failures
 
 
@@ -189,11 +155,13 @@ def install_files(
     else:
         known_sizes_by_target = {}
 
-    live_progress = bool(is_interactive_terminal() and console().is_terminal)
     progress_lock = Lock()
     reservation_lock = Lock()
     reserved_known_bytes = 0
-    def _process_file(file_spec: FileSpec, progress: Progress, task_id: TaskID) -> FileInstallFailure | None:
+    checkpoint_step = 10
+    checkpoint_state: dict[str, int] = {}
+
+    def _process_file(file_spec: FileSpec) -> FileInstallFailure | None:
         nonlocal reserved_known_bytes
         target_path = comfyui_dir / file_spec.target
         if target_path.is_file():
@@ -201,6 +169,13 @@ def install_files(
         known_size = known_sizes_by_target.get(file_spec.target)
         reserved_size = 0
         try:
+            if known_size is not None and known_size > 0:
+                print_info(
+                    f"[download] {file_spec.target}: started (0% 0/{format_size_for_display(known_size)})"
+                )
+            else:
+                print_info(f"[download] {file_spec.target}: started (size unknown)")
+
             if known_size is not None and known_size > 0:
                 with reservation_lock:
                     free_bytes_now = effective_free_bytes(comfyui_dir)
@@ -219,21 +194,31 @@ def install_files(
             def _on_download_progress(downloaded: int, total_size: int | None) -> None:
                 nonlocal last_progress_bytes
                 with progress_lock:
-                    total = total_size if total_size and total_size > 0 else None
-                    if total is not None:
-                        progress.update(task_id, total=total)
                     delta = downloaded - last_progress_bytes
                     if delta > 0:
-                        progress.advance(task_id, delta)
                         last_progress_bytes = downloaded
+                    effective_total = known_size if known_size and known_size > 0 else total_size
+                    total = effective_total if effective_total and effective_total > 0 else None
                     progress_snapshots[file_spec.target] = (downloaded, total)
+                    if total is None:
+                        return
+
+                    percent = int((downloaded * 100) / total) if total > 0 else 0
+                    last_checkpoint = checkpoint_state.get(file_spec.target, 0)
+                    next_checkpoint = last_checkpoint + checkpoint_step
+                    while next_checkpoint <= 90 and percent >= next_checkpoint:
+                        print_info(
+                            f"[download] {file_spec.target}: {next_checkpoint}% "
+                            f"({format_size_for_display(downloaded)}/{format_size_for_display(total)})"
+                        )
+                        last_checkpoint = next_checkpoint
+                        next_checkpoint += checkpoint_step
+                    checkpoint_state[file_spec.target] = last_checkpoint
 
             download_file(file_spec.url, target_path, hf_token=hf_token, on_progress=_on_download_progress)
         except Exception as exc:
             return FileInstallFailure(target=file_spec.target, error=str(exc))
         finally:
-            with progress_lock:
-                progress.stop_task(task_id)
             if reserved_size > 0:
                 with reservation_lock:
                     reserved_known_bytes = max(reserved_known_bytes - reserved_size, 0)
@@ -242,40 +227,36 @@ def install_files(
     failures: list[FileInstallFailure] = []
     progress_snapshots: dict[str, tuple[int, int | None]] = {}
     futures: dict = {}
-    with Progress(
-        TextColumn("{task.description}"),
-        BarColumn(style="grey50", complete_style="blue", finished_style="blue", pulse_style="blue"),
-        DownloadColumn(),
-        transient=live_progress,
-        disable=not live_progress,
-    ) as progress, ThreadPoolExecutor(max_workers=5) as executor:
+    with ThreadPoolExecutor(max_workers=5) as executor:
         for file_spec in files_to_download:
             initial_total = known_sizes_by_target.get(file_spec.target)
-            task_id = progress.add_task(
-                f"Downloading {file_spec.target}",
-                total=initial_total if initial_total and initial_total > 0 else None,
-            )
             progress_snapshots[file_spec.target] = (0, initial_total if initial_total and initial_total > 0 else None)
-            futures[executor.submit(_process_file, file_spec, progress, task_id)] = (file_spec, task_id)
+            futures[executor.submit(_process_file, file_spec)] = file_spec
 
         total_downloads = len(futures)
         completed_downloads = 0
         for future in as_completed(futures):
-            file_spec, task_id = futures[future]
+            file_spec = futures[future]
             completed_downloads += 1
             remaining_downloads = total_downloads - completed_downloads
             remaining_label = f"(remaining {remaining_downloads})"
             failure = future.result()
             if failure is not None:
                 failures.append(failure)
-                progress.update(task_id, visible=False)
                 print_error(f"Failed to download {file_spec.target}: {failure.error}")
                 print_info(f"Download progress: {remaining_label}")
             else:
-                task = progress.tasks[task_id]
-                progress_snapshots[file_spec.target] = (int(task.completed), int(task.total) if task.total else None)
-                progress.update(task_id, visible=False)
-                print_success(f"Downloaded {file_spec.target} {remaining_label}")
+                completed, total = progress_snapshots.get(file_spec.target, (0, None))
+                if total and total > 0:
+                    print_success(
+                        f"[download] {file_spec.target}: 100% "
+                        f"({format_size_for_display(completed)}/{format_size_for_display(total)}) completed {remaining_label}"
+                    )
+                else:
+                    print_success(
+                        f"[download] {file_spec.target}: completed "
+                        f"({format_size_for_display(completed)}) {remaining_label}"
+                    )
             if on_progress:
                 on_progress()
 
