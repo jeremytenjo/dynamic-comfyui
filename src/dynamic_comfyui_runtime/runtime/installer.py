@@ -41,7 +41,11 @@ def install_custom_nodes(
         node_path = custom_nodes_dir / node.repo_dir
         if node_path.is_dir():
             completed_nodes += 1
-            print_info(f"{node_prefix} {node.repo_dir}: already installed ({completed_nodes}/{total_nodes} complete)")
+            remaining_nodes = total_nodes - completed_nodes
+            print_info(
+                f"{node_prefix} {node.repo_dir}: already installed "
+                f"({completed_nodes}/{total_nodes} complete, remaining {remaining_nodes})"
+            )
             if on_progress:
                 on_progress()
             continue
@@ -55,8 +59,9 @@ def install_custom_nodes(
         except Exception as exc:
             failures.append(NodeInstallFailure(repo_dir=node.repo_dir, step="git clone", error=str(exc)))
             completed_nodes += 1
+            remaining_nodes = total_nodes - completed_nodes
             print_error(f"{node_prefix} {node.repo_dir}: clone failed ({exc})")
-            print_info(f"Custom nodes progress: {completed_nodes}/{total_nodes} complete")
+            print_info(f"Custom nodes progress: {completed_nodes}/{total_nodes} complete (remaining {remaining_nodes})")
             if on_progress:
                 on_progress()
             continue
@@ -70,8 +75,9 @@ def install_custom_nodes(
             except Exception as exc:
                 failures.append(NodeInstallFailure(repo_dir=node.repo_dir, step="requirements install", error=str(exc)))
                 completed_nodes += 1
+                remaining_nodes = total_nodes - completed_nodes
                 print_error(f"{node_prefix} {node.repo_dir}: requirements install failed ({exc})")
-                print_info(f"Custom nodes progress: {completed_nodes}/{total_nodes} complete")
+                print_info(f"Custom nodes progress: {completed_nodes}/{total_nodes} complete (remaining {remaining_nodes})")
                 if on_progress:
                     on_progress()
                 continue
@@ -87,8 +93,9 @@ def install_custom_nodes(
             except Exception as exc:
                 failures.append(NodeInstallFailure(repo_dir=node.repo_dir, step="install.py", error=str(exc)))
                 completed_nodes += 1
+                remaining_nodes = total_nodes - completed_nodes
                 print_error(f"{node_prefix} {node.repo_dir}: install.py failed ({exc})")
-                print_info(f"Custom nodes progress: {completed_nodes}/{total_nodes} complete")
+                print_info(f"Custom nodes progress: {completed_nodes}/{total_nodes} complete (remaining {remaining_nodes})")
                 if on_progress:
                     on_progress()
                 continue
@@ -96,7 +103,11 @@ def install_custom_nodes(
             print_info(f"{node_prefix} {node.repo_dir}: install.py skipped")
 
         completed_nodes += 1
-        print_success(f"{node_prefix} {node.repo_dir}: ready ({completed_nodes}/{total_nodes} complete)")
+        remaining_nodes = total_nodes - completed_nodes
+        print_success(
+            f"{node_prefix} {node.repo_dir}: ready "
+            f"({completed_nodes}/{total_nodes} complete, remaining {remaining_nodes})"
+        )
         if on_progress:
             on_progress()
     return failures
