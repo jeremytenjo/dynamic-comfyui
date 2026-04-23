@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import shutil
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
@@ -170,7 +171,9 @@ def install_files(
     reservation_lock = Lock()
     reserved_known_bytes = 0
     checkpoint_step = 10
+    log_interval_seconds = 20.0
     checkpoint_state: dict[str, int] = {}
+    last_log_time_by_target: dict[str, float] = {}
 
     def _process_file(file_spec: FileSpec) -> FileInstallFailure | None:
         nonlocal reserved_known_bytes
@@ -186,6 +189,7 @@ def install_files(
                 )
             else:
                 print_info(f"[download] {file_spec.target}: started (size unknown)")
+            last_log_time_by_target[file_spec.target] = time.monotonic()
 
             if known_size is not None and known_size > 0:
                 with reservation_lock:
@@ -205,6 +209,7 @@ def install_files(
             def _on_download_progress(downloaded: int, total_size: int | None) -> None:
                 nonlocal last_progress_bytes
                 with progress_lock:
+                    now = time.monotonic()
                     delta = downloaded - last_progress_bytes
                     if delta > 0:
                         last_progress_bytes = downloaded
@@ -212,19 +217,39 @@ def install_files(
                     total = effective_total if effective_total and effective_total > 0 else None
                     progress_snapshots[file_spec.target] = (downloaded, total)
                     if total is None:
+                        last_log_time = last_log_time_by_target.get(file_spec.target, now)
+                        if downloaded > 0 and now - last_log_time >= log_interval_seconds:
+                            print_info(
+                                f"[download] {file_spec.target}: progress "
+                                f"({format_size_for_display(downloaded)} downloaded)"
+                            )
+                            last_log_time_by_target[file_spec.target] = now
                         return
 
                     percent = int((downloaded * 100) / total) if total > 0 else 0
                     last_checkpoint = checkpoint_state.get(file_spec.target, 0)
                     next_checkpoint = last_checkpoint + checkpoint_step
+                    emitted_checkpoint = False
                     while next_checkpoint <= 90 and percent >= next_checkpoint:
                         print_info(
                             f"[download] {file_spec.target}: {next_checkpoint}% "
                             f"({format_size_for_display(downloaded)}/{format_size_for_display(total)})"
                         )
+                        emitted_checkpoint = True
                         last_checkpoint = next_checkpoint
                         next_checkpoint += checkpoint_step
                     checkpoint_state[file_spec.target] = last_checkpoint
+                    if emitted_checkpoint:
+                        last_log_time_by_target[file_spec.target] = now
+                        return
+
+                    last_log_time = last_log_time_by_target.get(file_spec.target, now)
+                    if downloaded > 0 and now - last_log_time >= log_interval_seconds:
+                        print_info(
+                            f"[download] {file_spec.target}: {percent}% "
+                            f"({format_size_for_display(downloaded)}/{format_size_for_display(total)})"
+                        )
+                        last_log_time_by_target[file_spec.target] = now
 
             download_file(file_spec.url, target_path, hf_token=hf_token, on_progress=_on_download_progress)
         except Exception as exc:
