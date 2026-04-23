@@ -355,7 +355,7 @@ def _print_install_plan_preview(merged: MergedManifest, custom_nodes_dir: Path, 
     print_rule("Install Plan")
 
     planned_nodes = Table()
-    planned_nodes.add_column("Node", overflow="fold")
+    planned_nodes.add_column("Custom Node", overflow="fold")
     planned_nodes.add_column("Source", overflow="fold")
     pending_node_rows = 0
     for specs in (merged.default_custom_nodes, merged.project_custom_nodes):
