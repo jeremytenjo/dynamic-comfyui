@@ -267,7 +267,8 @@ def _print_resource_summary(
     file_failures: list[FileInstallFailure],
 ) -> None:
     print_rule("Summary")
-    failure_nodes = {failure.repo_dir for failure in node_failures}
+    node_failure_map = {failure.repo_dir: failure for failure in node_failures}
+    file_failure_map = {failure.target: failure for failure in file_failures}
 
     def _installed_file_size_label(path: Path) -> str:
         if not path.is_file():
@@ -282,10 +283,11 @@ def _print_resource_summary(
         for specs in (merged.default_custom_nodes, merged.project_custom_nodes):
             for node in specs:
                 exists = (custom_nodes_dir / node.repo_dir).is_dir()
-                if node.repo_dir in failure_nodes:
-                    status = "failed"
+                failure = node_failure_map.get(node.repo_dir)
+                if failure is not None:
+                    status = f"[error]Failed: {failure.error}[/]"
                 else:
-                    status = "installed" if exists else "missing on disk"
+                    status = "[success]Success[/]" if exists else "[error]Failed: missing on disk[/]"
                 nodes_table.add_row(node.repo_dir, node.repo, status)
     else:
         nodes_table.add_row("(none)", "-", "-")
@@ -301,11 +303,16 @@ def _print_resource_summary(
             for spec in specs:
                 file_path = comfyui_dir / spec.target
                 exists = file_path.is_file()
+                failure = file_failure_map.get(spec.target)
+                if failure is not None:
+                    status = f"[error]Failed: {failure.error}[/]"
+                else:
+                    status = "[success]Success[/]" if exists else "[error]Failed: missing on disk[/]"
                 files_table.add_row(
                     spec.target,
                     spec.url,
                     _installed_file_size_label(file_path),
-                    "installed" if exists else "missing on disk",
+                    status,
                 )
     else:
         files_table.add_row("(none)", "-", "-", "-")
