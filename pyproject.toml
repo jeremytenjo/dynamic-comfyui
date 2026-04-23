@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "dynamic-comfyui-runtime"
-version = "1.20.0"
+version = "1.20.1"
 description = "Python runtime and CLI for Dynamic ComfyUI on RunPod"
 readme = "README.md"
 requires-python = ">=3.10"
