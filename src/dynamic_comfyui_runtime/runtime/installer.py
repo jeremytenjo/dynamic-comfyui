@@ -303,7 +303,7 @@ def install_files(
                     )
             if remaining_downloads == 1 and len(pending_targets) == 1:
                 remaining_target = next(iter(pending_targets))
-                print_info(f"Remaining download: {remaining_target}")
+                print_info(f"Remaining download: {remaining_target} is downloading")
             if on_progress:
                 on_progress()
 

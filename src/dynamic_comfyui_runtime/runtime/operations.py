@@ -739,7 +739,7 @@ def cmd_remove_deps(ctx: RuntimeContext, project_urls: list[str] | None = None) 
 
 def cmd_set_default_manifest_url(ctx: RuntimeContext, manifest_url: str | None = None) -> None:
     configure_process_env()
-    network_volume = set_network_volume_default(ctx.network_volume)
+    network_volume = _settings_network_volume(ctx)
     raw_url = manifest_url if manifest_url is not None else prompt_text("Enter default manifest URL").strip()
     if not raw_url:
         raise RuntimeError("Default manifest URL is required")
@@ -751,7 +751,7 @@ def cmd_set_default_manifest_url(ctx: RuntimeContext, manifest_url: str | None =
 
 def cmd_clear_default_manifest_url(ctx: RuntimeContext) -> None:
     configure_process_env()
-    network_volume = set_network_volume_default(ctx.network_volume)
+    network_volume = _settings_network_volume(ctx)
     clear_default_manifest_url_override(network_volume)
     print_info("Cleared default resources manifest URL. Defaults are now empty.")
 
