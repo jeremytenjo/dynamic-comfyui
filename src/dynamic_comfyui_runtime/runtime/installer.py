@@ -257,6 +257,17 @@ def install_files(
                         last_log_time_by_target[file_spec.target] = now
 
             download_file(file_spec.url, target_path, hf_token=hf_token, on_progress=_on_download_progress)
+            if not target_path.is_file():
+                raise RuntimeError("Download completed but target file is missing on disk")
+            if known_size is not None and known_size > 0:
+                actual_size = target_path.stat().st_size
+                if actual_size < known_size:
+                    raise RuntimeError(
+                        "Downloaded file is smaller than expected "
+                        f"({format_size_for_display(actual_size)}/{format_size_for_display(known_size)})"
+                    )
+                with progress_lock:
+                    progress_snapshots[file_spec.target] = (actual_size, known_size)
         except Exception as exc:
             return FileInstallFailure(target=file_spec.target, error=str(exc))
         finally:
