@@ -6,6 +6,11 @@ from dynamic_comfyui_runtime.cli import build_parser
 
 
 class CliParserTests(unittest.TestCase):
+    def test_install_default_deps(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["install-default-deps"])
+        self.assertEqual(args.command, "install-default-deps")
+
     def test_set_default_manifest_url_with_arg(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["set-default-manifest-url", "https://example.com/defaults.json"])

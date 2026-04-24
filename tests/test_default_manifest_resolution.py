@@ -45,6 +45,20 @@ class DefaultManifestResolutionTests(unittest.TestCase):
             data = json.loads(resolved.read_text(encoding="utf-8"))
             self.assertEqual(data, {"custom_nodes": [], "files": []})
 
+    def test_strict_resolver_fails_when_not_configured(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            with self.assertRaises(RuntimeError):
+                manifests.resolve_default_manifest_strict(root / "package.json", root / "tmp", root)
+
+    def test_strict_resolver_fails_on_download_error(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            write_default_manifest_url_override(root, "https://example.com/defaults.json")
+            with patch.object(manifests, "download_file", side_effect=RuntimeError("boom")):
+                with self.assertRaises(RuntimeError):
+                    manifests.resolve_default_manifest_strict(root / "package.json", root / "tmp", root)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -192,6 +192,39 @@ def resolve_default_manifest(
     return empty
 
 
+def resolve_default_manifest_strict(
+    package_json_path: Path,
+    temp_dir: Path,
+    network_volume: Path,
+    *,
+    fallback_network_volume: Path | None = None,
+    default_url: str | None = None,
+) -> Path:
+    _ = package_json_path
+    ensure_dir(temp_dir)
+    source_url = default_url or read_default_manifest_url_override(
+        network_volume,
+        fallback_network_volume=fallback_network_volume,
+    )
+    if not source_url:
+        raise RuntimeError(
+            "No default resources manifest URL configured. "
+            "Run 'dynamic-comfyui set-default-manifest-url <manifest-json-url>' first."
+        )
+
+    normalized_url = normalize_manifest_url(source_url)
+    validate_manifest_url(normalized_url)
+    candidate = temp_dir / "default-resources-remote.json"
+    try:
+        download_manifest(normalized_url, candidate)
+    except Exception as exc:
+        raise RuntimeError(
+            f"Failed to download configured default resources manifest: {normalized_url} ({exc})"
+        ) from exc
+    print_info(f"Loaded configured default resources manifest: [url]{normalized_url}[/]")
+    return candidate
+
+
 def _resolve_imported_manifests(root: ManifestData, temp_dir: Path) -> list[ManifestData]:
     ensure_dir(temp_dir)
     visited: set[str] = set()

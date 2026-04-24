@@ -13,6 +13,7 @@ from rich.table import Table
 from .common import ensure_dir, format_size_for_display, now_epoch, probe_remote_file_size, require_tools, utc_timestamp
 from .default_manifest_url import (
     clear_default_manifest_url_override,
+    read_default_manifest_url_override,
     write_default_manifest_url_override,
 )
 from .installer import (
@@ -32,6 +33,7 @@ from .manifests import (
     normalize_manifest_url,
     resources_for_cleanup,
     resolve_default_manifest,
+    resolve_default_manifest_strict,
     save_project_state,
     validate_manifest_url,
     write_empty_manifest,
@@ -119,6 +121,8 @@ Run this command in the terminal to stop ComfyUI `dynamic-comfyui stop`
 Run this command in the terminal to update nodes and files (uses the last saved JSON URL) `dynamic-comfyui update-nodes-and-models`
 
 Run this command in the terminal to install custom nodes/files only `dynamic-comfyui install-deps <project-json-url> [project-json-url ...]`
+
+Run this command in the terminal to install only your configured default dependencies `dynamic-comfyui install-default-deps`
 
 Run this command in the terminal to remove files only from project manifest URL(s) `dynamic-comfyui remove-deps <project-json-url> [project-json-url ...]`
 
@@ -704,6 +708,49 @@ def cmd_install_deps(ctx: RuntimeContext, project_urls: list[str] | None = None)
             raise
     print_info("Dependency installation complete.")
     _print_comfyui_link()
+
+
+def cmd_install_default_deps(ctx: RuntimeContext) -> None:
+    configure_process_env()
+    network_volume = set_network_volume_default(ctx.network_volume)
+    detected_comfyui = discover_comfyui_workspace(network_volume)
+    if detected_comfyui is not None:
+        detected_volume = detected_comfyui.parent
+        if detected_volume != network_volume:
+            print_info(f"Detected ComfyUI workspace at {detected_comfyui}. Using {detected_volume} as workspace root.")
+        network_volume = detected_volume
+    else:
+        print_warning(f"Could not auto-detect ComfyUI workspace. Using configured workspace root: {network_volume}")
+
+    settings_volume = _settings_network_volume(ctx)
+    default_url = read_default_manifest_url_override(settings_volume, fallback_network_volume=network_volume)
+    if not default_url:
+        raw_url = prompt_text("Enter default manifest URL").strip()
+        if not raw_url:
+            raise RuntimeError("Default manifest URL is required")
+        normalized = normalize_manifest_url(raw_url)
+        validate_manifest_url(normalized)
+        write_default_manifest_url_override(settings_volume, normalized)
+        print_info(f"Set default resources manifest URL: [url]{normalized}[/]")
+        default_url = normalized
+
+    ctx.network_volume = network_volume
+    default_manifest_temp_dir = Path(tempfile.mkdtemp(prefix="dynamic-comfyui-install-default-manifest-"))
+    default_manifest_path = resolve_default_manifest_strict(
+        ctx.package_json_path,
+        default_manifest_temp_dir,
+        settings_volume,
+        fallback_network_volume=network_volume,
+        default_url=default_url,
+    )
+
+    empty_project_manifest_path = active_project_manifest_path(network_volume)
+    write_empty_manifest(empty_project_manifest_path)
+    run_dependency_install_flow(
+        ctx,
+        empty_project_manifest_path,
+        default_manifest_path=default_manifest_path,
+    )
 
 
 def cmd_remove_deps(ctx: RuntimeContext, project_urls: list[str] | None = None) -> None:

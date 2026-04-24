@@ -9,6 +9,7 @@ from .runtime.operations import (
     RuntimeContext,
     cmd_add_project,
     cmd_clear_default_manifest_url,
+    cmd_install_default_deps,
     cmd_install_deps,
     cmd_install,
     cmd_remove_deps,
@@ -65,6 +66,9 @@ def _help_text() -> str:
 - dc install-deps
   Install custom nodes/files only. Usage: dc install-deps [project_json_url ...]
 
+- dc install-default-deps
+  Install only default custom nodes/files from your configured default manifest URL.
+
 - dc remove-deps
   Remove files only from project manifest URL(s). Usage: dc remove-deps [project_json_url ...]
 
@@ -118,6 +122,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     for cmd in (
         "install",
+        "install-default-deps",
         "start-new-project",
         "add-project",
         "replace-project",
@@ -164,6 +169,7 @@ def main() -> None:
 
     ctx = _context()
     handlers = {
+        "install-default-deps": cmd_install_default_deps,
         "install-deps": cmd_install_deps,
         "remove-deps": cmd_remove_deps,
         "start": cmd_start,
