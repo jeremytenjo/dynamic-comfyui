@@ -77,6 +77,7 @@ class RuntimeContext:
     package_json_path: Path
     setup_page_html_path: Path
     install_start_ts: int | None = None
+    configured_network_volume: Path | None = None
 
 
 @dataclass
@@ -90,7 +91,8 @@ class InstallExecution:
 
 
 def _settings_network_volume(ctx: RuntimeContext) -> Path:
-    return set_network_volume_default(Path(os.environ.get("NETWORK_VOLUME", str(ctx.network_volume))))
+    configured = ctx.configured_network_volume or ctx.network_volume
+    return set_network_volume_default(Path(os.environ.get("NETWORK_VOLUME", str(configured))))
 
 
 def _instruction_text() -> str:

@@ -51,6 +51,7 @@ def _context() -> RuntimeContext:
         network_volume=network_volume,
         package_json_path=_default_package_json_path(),
         setup_page_html_path=_default_setup_page_html_path(),
+        configured_network_volume=network_volume,
     )
 
 
