@@ -270,9 +270,11 @@ def install_files(
             futures[executor.submit(_process_file, file_spec)] = file_spec
 
         total_downloads = len(futures)
+        pending_targets = {file_spec.target for file_spec in files_to_download}
         completed_downloads = 0
         for future in as_completed(futures):
             file_spec = futures[future]
+            pending_targets.discard(file_spec.target)
             completed_downloads += 1
             remaining_downloads = total_downloads - completed_downloads
             remaining_label = f"(remaining {remaining_downloads})"
@@ -299,6 +301,9 @@ def install_files(
                         f"[download] {file_spec.target}: completed "
                         f"({format_size_for_display(completed)}) {remaining_label}"
                     )
+            if remaining_downloads == 1 and len(pending_targets) == 1:
+                remaining_target = next(iter(pending_targets))
+                print_info(f"Remaining download: {remaining_target}")
             if on_progress:
                 on_progress()
 
