@@ -176,6 +176,25 @@ def install_files(
     last_log_time_by_target: dict[str, float] = {}
     highlighted_remaining_target: str | None = None
 
+    def _print_remaining_downloads(pending_targets: set[str]) -> None:
+        if not pending_targets:
+            return
+
+        with progress_lock:
+            pending_snapshot = [
+                (target, progress_snapshots.get(target, (0, None)))
+                for target in sorted(pending_targets)
+            ]
+
+        print_info(f"Remaining downloads ({len(pending_snapshot)}):")
+        for target, (downloaded, total) in pending_snapshot:
+            if total and total > 0:
+                print_info(
+                    f" - {target}: {format_size_for_display(downloaded)}/{format_size_for_display(total)}"
+                )
+            else:
+                print_info(f" - {target}: {format_size_for_display(downloaded)} downloaded")
+
     def _process_file(file_spec: FileSpec) -> FileInstallFailure | None:
         nonlocal reserved_known_bytes
         target_path = comfyui_dir / file_spec.target
@@ -317,23 +336,16 @@ def install_files(
                         f"[download] {file_spec.target}: completed "
                         f"({format_size_for_display(completed)}) {remaining_label}"
                     )
+            if remaining_downloads > 0:
+                _print_remaining_downloads(pending_targets)
+
             if remaining_downloads == 1 and len(pending_targets) == 1:
                 remaining_target = next(iter(pending_targets))
                 with progress_lock:
                     highlighted_remaining_target = remaining_target
                     last_log_time_by_target[remaining_target] = 0.0
-                    remaining_completed, remaining_total = progress_snapshots.get(remaining_target, (0, None))
-                if remaining_total and remaining_total > 0:
-                    print_info(
-                        "Remaining download: "
-                        f"{remaining_target} is downloading "
-                        f"({format_size_for_display(remaining_completed)}/{format_size_for_display(remaining_total)})"
-                    )
-                else:
-                    print_info(
-                        "Remaining download: "
-                        f"{remaining_target} is downloading ({format_size_for_display(remaining_completed)} downloaded)"
-                    )
+            else:
+                highlighted_remaining_target = None
             if on_progress:
                 on_progress()
 
