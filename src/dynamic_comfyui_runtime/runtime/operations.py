@@ -424,7 +424,7 @@ def _print_install_plan_preview(merged: MergedManifest, custom_nodes_dir: Path, 
         total_display = format_size_for_display(known_total_bytes)
         if unknown_size_count > 0:
             total_display = f"{total_display}"
-        planned_files.add_row("Total", "-", f"[bold]{total_display}[/]")
+        planned_files.add_row("[bold]Total[/]", "-", f"[bold]{total_display}[/]")
     if pending_file_rows > 0:
         console().print(planned_files)
 
@@ -488,7 +488,7 @@ def _print_resource_summary(
                     status,
                     size_display,
                 )
-        files_table.add_row("Total", "-", "-", f"[bold]{format_size_for_display(total_installed_bytes)}[/]")
+        files_table.add_row("[bold]Total[/]", "-", "-", f"[bold]{format_size_for_display(total_installed_bytes)}[/]")
     else:
         files_table.add_row("(none)", "-", "-", "-")
     console().print(files_table)
