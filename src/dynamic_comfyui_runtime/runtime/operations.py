@@ -632,7 +632,8 @@ def _dependency_completion_message(ctx: RuntimeContext) -> str:
 
 def _format_elapsed_duration(elapsed_seconds: int) -> str:
     if elapsed_seconds < 60:
-        return "<1 Minute"
+        second_label = "Second" if elapsed_seconds == 1 else "Seconds"
+        return f"{elapsed_seconds} {second_label}"
     elapsed_minutes = elapsed_seconds // 60
     minute_label = "Minute" if elapsed_minutes == 1 else "Minutes"
     return f"{elapsed_minutes} {minute_label}"
