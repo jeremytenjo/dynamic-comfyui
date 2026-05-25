@@ -293,6 +293,8 @@ def start_comfyui_service(comfyui_dir: Path, network_volume: Path, install_start
             "0.0.0.0",
             "--enable-manager",
             "--disable-cuda-malloc",
+            "--cache-none",
+            "--mmap-torch-files",
         ],
         cwd=comfyui_dir,
         quiet=True,
@@ -331,7 +333,16 @@ def start_comfyui_service_via_main_py(comfyui_dir: Path, install_start_ts: int |
     log_path.unlink(missing_ok=True)
     with log_path.open("w", encoding="utf-8") as log_file:
         subprocess.Popen(  # noqa: S603
-            [python_cmd, "main.py", "--listen", "0.0.0.0", "--port", "8188"],
+            [
+                python_cmd,
+                "main.py",
+                "--listen",
+                "0.0.0.0",
+                "--port",
+                "8188",
+                "--cache-none",
+                "--mmap-torch-files",
+            ],
             cwd=str(comfyui_dir),
             stdout=log_file,
             stderr=log_file,
