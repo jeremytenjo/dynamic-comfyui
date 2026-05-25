@@ -14,6 +14,9 @@ from typing import BinaryIO, Iterable
 
 from .ui import print_info
 
+_DOWNLOAD_BACKEND = "wget"  # Options: "wget", "urllib"
+_WGET_INSTALL_ATTEMPTED = False
+
 
 def run(
     cmd: list[str],
@@ -59,6 +62,35 @@ def run(
 
 def command_exists(name: str) -> bool:
     return shutil.which(name) is not None
+
+
+def ensure_wget_available() -> bool:
+    global _WGET_INSTALL_ATTEMPTED
+
+    if command_exists("wget"):
+        return True
+    if _WGET_INSTALL_ATTEMPTED:
+        return False
+    _WGET_INSTALL_ATTEMPTED = True
+
+    if not command_exists("apt-get"):
+        print_info("wget is unavailable and apt-get is not installed; falling back to urllib downloader.")
+        return False
+
+    print_info("wget is unavailable. Installing wget...")
+    try:
+        run(["apt-get", "update", "--yes"], timeout=180)
+        run(["apt-get", "install", "--yes", "--no-install-recommends", "wget"], timeout=180)
+    except Exception as exc:
+        print_info(f"wget installation failed; falling back to urllib downloader. ({exc})")
+        return False
+
+    if command_exists("wget"):
+        print_info("wget installed successfully.")
+        return True
+
+    print_info("wget installation completed but command is still unavailable; falling back to urllib downloader.")
+    return False
 
 
 def ensure_dir(path: Path) -> None:
@@ -137,7 +169,13 @@ def download_file(
     hf_token: str | None = None,
     on_progress: callable | None = None,
 ) -> None:
-    ensure_dir(target.parent)
+    if _DOWNLOAD_BACKEND == "wget":
+        _download_file_with_wget(url, target, hf_token=hf_token, on_progress=on_progress)
+        return
+    _download_file_with_urllib(url, target, hf_token=hf_token, on_progress=on_progress)
+
+
+def _request_headers(url: str, hf_token: str | None) -> dict[str, str]:
     parsed = urllib.parse.urlparse(url)
     host = parsed.netloc.lower()
     headers = {
@@ -149,6 +187,56 @@ def download_file(
     if "civitai.com" in host:
         headers["Referer"] = "https://civitai.com/"
         headers["Origin"] = "https://civitai.com"
+    return headers
+
+
+def _download_file_with_wget(
+    url: str,
+    target: Path,
+    *,
+    hf_token: str | None = None,
+    on_progress: callable | None = None,
+) -> None:
+    ensure_dir(target.parent)
+    if not ensure_wget_available():
+        _download_file_with_urllib(url, target, hf_token=hf_token, on_progress=on_progress)
+        return
+
+    total_size = probe_remote_file_size(url, hf_token=hf_token)
+    if total_size and total_size > 0:
+        free_bytes = effective_free_bytes(target.parent)
+        if total_size > free_bytes:
+            raise RuntimeError(
+                "Insufficient storage before starting download. "
+                f"Need {format_size_for_display(total_size)} but only "
+                f"{format_size_for_display(free_bytes)} is available for {url}"
+            )
+
+    headers = _request_headers(url, hf_token)
+    cmd = ["wget", "-q", "-O", str(target)]
+    for key, value in headers.items():
+        cmd.extend(["--header", f"{key}: {value}"])
+    cmd.append(url)
+
+    try:
+        run(cmd)
+        if on_progress:
+            downloaded = target.stat().st_size if target.is_file() else 0
+            on_progress(downloaded, total_size)
+    except Exception as exc:
+        target.unlink(missing_ok=True)
+        raise RuntimeError(f"Download failed for {url}: {exc}") from exc
+
+
+def _download_file_with_urllib(
+    url: str,
+    target: Path,
+    *,
+    hf_token: str | None = None,
+    on_progress: callable | None = None,
+) -> None:
+    ensure_dir(target.parent)
+    headers = _request_headers(url, hf_token)
     req = urllib.request.Request(url, headers=headers, method="GET")
     try:
         with urllib.request.urlopen(req, timeout=120) as resp:  # noqa: S310
@@ -211,17 +299,7 @@ def _preallocate_download_target(url: str, target: Path, out_file: BinaryIO, tot
 
 
 def probe_remote_file_size(url: str, *, hf_token: str | None = None) -> int | None:
-    parsed = urllib.parse.urlparse(url)
-    host = parsed.netloc.lower()
-    headers = {
-        "Accept": "*/*",
-        "User-Agent": "dynamic-comfyui-runtime-downloader/1.0",
-    }
-    if "huggingface.co" in host and hf_token:
-        headers["Authorization"] = f"Bearer {hf_token}"
-    if "civitai.com" in host:
-        headers["Referer"] = "https://civitai.com/"
-        headers["Origin"] = "https://civitai.com"
+    headers = _request_headers(url, hf_token)
 
     def _parse_positive_int(raw: str | None) -> int | None:
         if not raw:
