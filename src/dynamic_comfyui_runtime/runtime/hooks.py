@@ -69,3 +69,14 @@ def confirm_and_run_on_install_complete_commands(commands: list[str], *, cwd: Pa
             run(["bash", "-lc", command], cwd=cwd, quiet=True)
         except Exception as exc:
             raise RuntimeError(f"on_install_complete command failed: {command} ({exc})") from exc
+
+
+def run_on_install_complete_commands(commands: list[str], *, cwd: Path | None = None) -> None:
+    if not commands:
+        return
+    for index, command in enumerate(commands, start=1):
+        print_info(f"Running on_install_complete command [{index}/{len(commands)}]: {command}")
+        try:
+            run(["bash", "-lc", command], cwd=cwd, quiet=True)
+        except Exception as exc:
+            raise RuntimeError(f"on_install_complete command failed: {command} ({exc})") from exc

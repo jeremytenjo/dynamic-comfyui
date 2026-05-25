@@ -28,6 +28,7 @@ from .hooks import (
     HookedManifest,
     collect_on_install_complete_commands,
     confirm_and_run_on_install_complete_commands,
+    run_on_install_complete_commands,
     validate_no_overriding_hook_conflicts,
 )
 from .manifests import (
@@ -716,13 +717,46 @@ def _save_selected_project(network_volume: Path, manifest_path: Path, source_url
 def cmd_start(ctx: RuntimeContext, project_url: str | None = None) -> None:
     configure_process_env()
     network_volume = set_network_volume_default(ctx.network_volume)
+    on_install_complete_commands: list[str] = []
     if project_url is not None:
         manifest_path, source_url = prepare_project_manifest(network_volume, project_url)
     else:
-        manifest_path, source_url = prompt_and_prepare_project_manifest(network_volume)
+        reused_saved_project = False
+        try:
+            _saved_key, saved_source_url = load_project_state(network_volume)
+        except Exception:
+            saved_source_url = ""
+
+        if saved_source_url:
+            saved_manifest_path, saved_manifest_source_url = prepare_project_manifest(network_volume, saved_source_url)
+            saved_manifest_data = load_manifest_data(saved_manifest_path)
+            saved_hook = saved_manifest_data.hooks.on_install_complete
+            if saved_hook is not None and saved_hook.commands:
+                manifest_path, source_url = saved_manifest_path, saved_manifest_source_url
+                on_install_complete_commands = list(saved_hook.commands)
+                reused_saved_project = True
+                print_info(
+                    "Reusing saved project URL because it defines hooks.on_install_complete. "
+                    "Run 'dynamic-comfyui start <project-json-url>' to override."
+                )
+            else:
+                manifest_path, source_url = prompt_and_prepare_project_manifest(network_volume)
+        else:
+            manifest_path, source_url = prompt_and_prepare_project_manifest(network_volume)
+        if not reused_saved_project:
+            parsed_manifest_data = load_manifest_data(manifest_path)
+            parsed_hook = parsed_manifest_data.hooks.on_install_complete
+            if parsed_hook is not None:
+                on_install_complete_commands = list(parsed_hook.commands)
+    if project_url is not None:
+        parsed_manifest_data = load_manifest_data(manifest_path)
+        parsed_hook = parsed_manifest_data.hooks.on_install_complete
+        if parsed_hook is not None:
+            on_install_complete_commands = list(parsed_hook.commands)
     _save_selected_project(network_volume, manifest_path, source_url)
     try:
         run_comfyui_install_flow(ctx, manifest_path)
+        run_on_install_complete_commands(on_install_complete_commands, cwd=network_volume)
     except Exception as exc:
         comfyui_dir, _ = ensure_comfyui_workspace(network_volume)
         mark_failed(None, comfyui_dir, f"Installation failed. {exc}")
