@@ -5,6 +5,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from dynamic_comfyui_runtime.runtime.hooks import ManifestHooks
 from dynamic_comfyui_runtime.runtime.operations import RuntimeContext, cmd_install_deps
 
 
@@ -38,6 +39,22 @@ class InstallDepsSettingsVolumeTests(unittest.TestCase):
                 patch(
                     "dynamic_comfyui_runtime.runtime.operations.prepare_project_manifest",
                     return_value=(detected_root / "project.json", "https://example.com/project.json"),
+                ),
+                patch(
+                    "dynamic_comfyui_runtime.runtime.operations.load_manifest_data",
+                    return_value=type("ManifestDataStub", (), {"hooks": ManifestHooks()})(),
+                ),
+                patch(
+                    "dynamic_comfyui_runtime.runtime.operations.ensure_comfyui_workspace",
+                    return_value=(detected_workspace, detected_workspace / "custom_nodes"),
+                ),
+                patch(
+                    "dynamic_comfyui_runtime.runtime.operations._load_manifest_context",
+                    return_value=(object(), None),
+                ),
+                patch(
+                    "dynamic_comfyui_runtime.runtime.operations._ensure_hf_token_for_manifest_batch",
+                    return_value=None,
                 ),
                 patch("dynamic_comfyui_runtime.runtime.operations._save_selected_project"),
                 patch("dynamic_comfyui_runtime.runtime.operations.run_dependency_install_flow"),

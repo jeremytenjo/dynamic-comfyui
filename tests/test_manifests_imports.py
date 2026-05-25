@@ -16,6 +16,48 @@ def _write_json(path: Path, payload: dict) -> None:
 
 
 class ManifestImportsTests(unittest.TestCase):
+    def test_hooks_on_install_complete_commands_parsed(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            project_manifest = root / "project.json"
+            _write_json(
+                project_manifest,
+                {
+                    "custom_nodes": [],
+                    "files": [],
+                    "hooks": {
+                        "on_install_complete": {
+                            "commands": ["echo one", "echo two"],
+                        }
+                    },
+                },
+            )
+
+            data = manifests.load_manifest_data(project_manifest)
+            self.assertIsNotNone(data.hooks.on_install_complete)
+            assert data.hooks.on_install_complete is not None
+            self.assertEqual(data.hooks.on_install_complete.commands, ["echo one", "echo two"])
+
+    def test_hooks_on_install_complete_commands_invalid_type_raises(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            project_manifest = root / "project.json"
+            _write_json(
+                project_manifest,
+                {
+                    "custom_nodes": [],
+                    "files": [],
+                    "hooks": {
+                        "on_install_complete": {
+                            "commands": "echo one",
+                        }
+                    },
+                },
+            )
+
+            with self.assertRaises(ValueError):
+                manifests.load_manifest_data(project_manifest)
+
     def test_import_projects_requires_project_url_only(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)

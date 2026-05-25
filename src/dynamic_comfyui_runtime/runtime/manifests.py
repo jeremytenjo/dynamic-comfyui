@@ -6,6 +6,7 @@ from pathlib import Path
 
 from .common import download_file, ensure_dir, normalize_github_blob_url, read_json
 from .default_manifest_url import read_default_manifest_url_override
+from .hooks import InstallCompleteHook, ManifestHooks
 from .ui import print_info, print_warning
 
 
@@ -32,6 +33,7 @@ class ManifestData:
     custom_nodes: list[CustomNode]
     files: list[FileSpec]
     import_projects: list[ImportProject]
+    hooks: ManifestHooks
 
 
 @dataclass(frozen=True)
@@ -108,12 +110,41 @@ def _parse_manifest(path: Path) -> ManifestData:
         validate_manifest_url(project_url)
         import_projects.append(ImportProject(project_url=project_url))
 
+    raw_hooks = data.get("hooks")
+    hooks = _parse_manifest_hooks(raw_hooks)
+
     return ManifestData(
         require_huggingface_token=raw_require_hf_token,
         custom_nodes=nodes,
         files=files,
         import_projects=import_projects,
+        hooks=hooks,
     )
+
+
+def _parse_manifest_hooks(raw_hooks: object) -> ManifestHooks:
+    if raw_hooks is None:
+        return ManifestHooks()
+    if not isinstance(raw_hooks, dict):
+        raise ValueError("Manifest field 'hooks' must be an object")
+
+    on_install_complete_raw = raw_hooks.get("on_install_complete")
+    on_install_complete: InstallCompleteHook | None = None
+    if on_install_complete_raw is not None:
+        if not isinstance(on_install_complete_raw, dict):
+            raise ValueError("Manifest field 'hooks.on_install_complete' must be an object")
+        commands_raw = on_install_complete_raw.get("commands")
+        if not isinstance(commands_raw, list):
+            raise ValueError("Manifest field 'hooks.on_install_complete.commands' must be a list")
+        commands: list[str] = []
+        for idx, item in enumerate(commands_raw):
+            command = str(item).strip()
+            if not command:
+                raise ValueError(f"hooks.on_install_complete.commands[{idx}] must be a non-empty string")
+            commands.append(command)
+        on_install_complete = InstallCompleteHook(commands=commands)
+
+    return ManifestHooks(on_install_complete=on_install_complete)
 
 
 def write_empty_manifest(path: Path) -> None:
@@ -284,7 +315,12 @@ def _resolved_project_manifest(project_manifest_path: Path, temp_dir: Path) -> M
         custom_nodes=list(merged_nodes_map.values()),
         files=list(merged_files_map.values()),
         import_projects=root.import_projects,
+        hooks=root.hooks,
     )
+
+
+def load_manifest_data(path: Path) -> ManifestData:
+    return _parse_manifest(path)
 
 
 def merge_manifests(project_manifest_path: Path, default_manifest_path: Path, *, temp_dir: Path | None = None) -> MergedManifest:

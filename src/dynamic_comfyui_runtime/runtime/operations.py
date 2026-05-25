@@ -24,10 +24,17 @@ from .installer import (
     install_files,
     remove_project_resources,
 )
+from .hooks import (
+    HookedManifest,
+    collect_on_install_complete_commands,
+    confirm_and_run_on_install_complete_commands,
+    validate_no_overriding_hook_conflicts,
+)
 from .manifests import (
     FileSpec,
     MergedManifest,
     download_manifest,
+    load_manifest_data,
     load_project_state,
     merge_manifests,
     normalize_manifest_url,
@@ -757,9 +764,14 @@ def cmd_install_deps(ctx: RuntimeContext, project_urls: list[str] | None = None)
         fallback_network_volume=network_volume,
     )
     project_manifests: list[tuple[Path, str]] = []
+    hooked_manifests: list[HookedManifest] = []
     for project_url in project_urls:
         manifest_path, source_url = prepare_project_manifest(network_volume, project_url)
+        manifest_data = load_manifest_data(manifest_path)
+        hooked_manifests.append(HookedManifest(source_url=source_url, hooks=manifest_data.hooks))
         project_manifests.append((manifest_path, source_url))
+    validate_no_overriding_hook_conflicts(hooked_manifests)
+    on_install_complete_commands = collect_on_install_complete_commands(hooked_manifests)
 
     comfyui_dir, _custom_nodes_dir = ensure_comfyui_workspace(network_volume)
     merged_manifests: list[MergedManifest] = []
@@ -800,6 +812,7 @@ def cmd_install_deps(ctx: RuntimeContext, project_urls: list[str] | None = None)
     if total > 1:
         total_elapsed_seconds = max(0, now_epoch() - batch_start_ts)
         print_info(f"All project dependency installations complete in [bold]{_format_elapsed_duration(total_elapsed_seconds)}[/].")
+    confirm_and_run_on_install_complete_commands(on_install_complete_commands, cwd=network_volume)
     _print_comfyui_link()
 
 

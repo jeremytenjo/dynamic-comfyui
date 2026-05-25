@@ -16,6 +16,9 @@ Define project manifests (custom nodes + files) for repeatable ComfyUI setup on 
 - `dc install-deps`
   Install custom nodes/files only.
   Usage: `dc install-deps <project-json-url>` or `dc install-deps` (prompts for URL; Enter = defaults-only).
+  Multi-URL usage is also supported: `dc install-deps <project-json-url> [project-json-url ...]`.
+  For multi-URL runs, if two or more manifests define the same overriding hook (currently `hooks.on_install_complete`), the command fails before installation starts.
+  If hook commands are present and all installs succeed, the command prompts once at the end to run collected `on_install_complete` commands.
   ComfyUI workspace is auto-detected.
   This command does not start Jupyter or ComfyUI.
 
@@ -157,6 +160,26 @@ Import behavior:
 - Failed imports are skipped with a warning.
 - Later imports override earlier imports for duplicate `custom_nodes.repo_dir` and `files.target`.
 - Top-level project manifest entries override all imported entries.
+
+Optional hooks:
+
+```json
+{
+  "hooks": {
+    "on_install_complete": {
+      "commands": [
+        "cd /workspace/runpod-slim/ComfyUI",
+        "pkill -f main.py",
+        "python3 main.py --listen 0.0.0.0 --port 8188 --cache-none --mmap-torch-files"
+      ]
+    }
+  }
+}
+```
+
+- `hooks.on_install_complete.commands` must be a list of non-empty shell command strings.
+- For `dc install-deps` with multiple URLs in one run, only one selected manifest may define `hooks.on_install_complete`.
+- After all selected manifests finish installing successfully, `dc install-deps` prompts once to run collected `on_install_complete` commands.
 
 ### Hugging Face Token Handling
 
