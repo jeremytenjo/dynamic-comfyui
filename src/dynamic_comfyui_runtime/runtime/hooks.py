@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+import subprocess
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 
-from .common import run
 from .ui import print_info, prompt_confirm
 
 
@@ -66,7 +66,7 @@ def confirm_and_run_on_install_complete_commands(commands: list[str], *, cwd: Pa
     for index, command in enumerate(commands, start=1):
         print_info(f"Running on_install_complete command [{index}/{len(commands)}]: {command}")
         try:
-            run(["bash", "-lc", command], cwd=cwd, quiet=True)
+            subprocess.run(["bash", "-lc", command], cwd=str(cwd) if cwd else None, check=True)  # noqa: S603
         except Exception as exc:
             raise RuntimeError(f"on_install_complete command failed: {command} ({exc})") from exc
 
@@ -77,6 +77,6 @@ def run_on_install_complete_commands(commands: list[str], *, cwd: Path | None = 
     for index, command in enumerate(commands, start=1):
         print_info(f"Running on_install_complete command [{index}/{len(commands)}]: {command}")
         try:
-            run(["bash", "-lc", command], cwd=cwd, quiet=True)
+            subprocess.run(["bash", "-lc", command], cwd=str(cwd) if cwd else None, check=True)  # noqa: S603
         except Exception as exc:
             raise RuntimeError(f"on_install_complete command failed: {command} ({exc})") from exc
