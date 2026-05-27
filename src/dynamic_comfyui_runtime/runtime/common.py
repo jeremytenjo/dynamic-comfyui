@@ -38,8 +38,8 @@ def run(
     try:
         completed = subprocess.run(cmd, timeout=timeout, **kwargs)  # noqa: S603
     except subprocess.TimeoutExpired as exc:
-        stdout_tail = (exc.stdout or "").strip()
-        stderr_tail = (exc.stderr or "").strip()
+        stdout_tail = _normalize_process_output(exc.stdout).strip()
+        stderr_tail = _normalize_process_output(exc.stderr).strip()
         details: list[str] = []
         if stdout_tail:
             details.append(f"stdout: {stdout_tail[-600:]}")
@@ -48,8 +48,8 @@ def run(
         suffix = f" ({'; '.join(details)})" if details else ""
         raise RuntimeError(f"Command timed out after {timeout}s: {' '.join(cmd)}{suffix}") from exc
     if check and completed.returncode != 0:
-        stdout_tail = (completed.stdout or "").strip()
-        stderr_tail = (completed.stderr or "").strip()
+        stdout_tail = _normalize_process_output(completed.stdout).strip()
+        stderr_tail = _normalize_process_output(completed.stderr).strip()
         details: list[str] = []
         if stdout_tail:
             details.append(f"stdout: {stdout_tail[-600:]}")
@@ -58,6 +58,14 @@ def run(
         suffix = f" ({'; '.join(details)})" if details else ""
         raise RuntimeError(f"Command failed ({completed.returncode}): {' '.join(cmd)}{suffix}")
     return completed
+
+
+def _normalize_process_output(value: str | bytes | None) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    return value
 
 
 def command_exists(name: str) -> bool:

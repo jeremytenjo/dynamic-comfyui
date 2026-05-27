@@ -755,8 +755,11 @@ def cmd_start(ctx: RuntimeContext, project_url: str | None = None) -> None:
             on_install_complete_commands = list(parsed_hook.commands)
     _save_selected_project(network_volume, manifest_path, source_url)
     try:
-        run_comfyui_install_flow(ctx, manifest_path)
-        run_on_install_complete_commands(on_install_complete_commands, cwd=network_volume)
+        if on_install_complete_commands:
+            run_dependency_install_flow(ctx, manifest_path)
+            run_on_install_complete_commands(on_install_complete_commands, cwd=network_volume)
+        else:
+            run_comfyui_install_flow(ctx, manifest_path)
     except Exception as exc:
         comfyui_dir, _ = ensure_comfyui_workspace(network_volume)
         mark_failed(None, comfyui_dir, f"Installation failed. {exc}")

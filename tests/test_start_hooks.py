@@ -39,12 +39,15 @@ class StartHooksTests(unittest.TestCase):
                 ),
                 patch("dynamic_comfyui_runtime.runtime.operations.prompt_and_prepare_project_manifest") as prompt_manifest,
                 patch("dynamic_comfyui_runtime.runtime.operations._save_selected_project"),
-                patch("dynamic_comfyui_runtime.runtime.operations.run_comfyui_install_flow"),
+                patch("dynamic_comfyui_runtime.runtime.operations.run_dependency_install_flow") as run_dependency_install,
+                patch("dynamic_comfyui_runtime.runtime.operations.run_comfyui_install_flow") as run_comfyui_install,
                 patch("dynamic_comfyui_runtime.runtime.operations.run_on_install_complete_commands") as run_hook_commands,
             ):
                 cmd_start(ctx)
 
             prompt_manifest.assert_not_called()
+            run_dependency_install.assert_called_once_with(ctx, saved_manifest)
+            run_comfyui_install.assert_not_called()
             run_hook_commands.assert_called_once_with(["echo saved"], cwd=root)
 
     def test_start_runs_on_install_complete_when_project_url_is_provided(self) -> None:
@@ -64,12 +67,39 @@ class StartHooksTests(unittest.TestCase):
                     return_value=(provided_manifest, "https://example.com/provided.json"),
                 ),
                 patch("dynamic_comfyui_runtime.runtime.operations._save_selected_project"),
-                patch("dynamic_comfyui_runtime.runtime.operations.run_comfyui_install_flow"),
+                patch("dynamic_comfyui_runtime.runtime.operations.run_dependency_install_flow") as run_dependency_install,
+                patch("dynamic_comfyui_runtime.runtime.operations.run_comfyui_install_flow") as run_comfyui_install,
                 patch("dynamic_comfyui_runtime.runtime.operations.run_on_install_complete_commands") as run_hook_commands,
             ):
                 cmd_start(ctx, "https://example.com/provided.json")
 
+            run_dependency_install.assert_called_once_with(ctx, provided_manifest)
+            run_comfyui_install.assert_not_called()
             run_hook_commands.assert_called_once_with(["echo provided"], cwd=root)
+
+    def test_start_uses_comfyui_install_flow_when_manifest_has_no_hook_commands(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            ctx = self._ctx(root)
+            manifest = root / "project.json"
+            manifest.write_text('{"custom_nodes":[],"files":[]}\n', encoding="utf-8")
+
+            with (
+                patch("dynamic_comfyui_runtime.runtime.operations.configure_process_env"),
+                patch(
+                    "dynamic_comfyui_runtime.runtime.operations.prepare_project_manifest",
+                    return_value=(manifest, "https://example.com/project.json"),
+                ),
+                patch("dynamic_comfyui_runtime.runtime.operations._save_selected_project"),
+                patch("dynamic_comfyui_runtime.runtime.operations.run_dependency_install_flow") as run_dependency_install,
+                patch("dynamic_comfyui_runtime.runtime.operations.run_comfyui_install_flow") as run_comfyui_install,
+                patch("dynamic_comfyui_runtime.runtime.operations.run_on_install_complete_commands") as run_hook_commands,
+            ):
+                cmd_start(ctx, "https://example.com/project.json")
+
+            run_comfyui_install.assert_called_once_with(ctx, manifest)
+            run_dependency_install.assert_not_called()
+            run_hook_commands.assert_not_called()
 
 
 if __name__ == "__main__":
