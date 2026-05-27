@@ -65,6 +65,9 @@ Define project manifests (custom nodes + files) for repeatable ComfyUI setup on 
 - `dc system-info`
   Print ComfyUI/frontend/Python/PyTorch/CUDA/GPU/RAM version information.
 
+- `dc deps-ls`
+  List session project manifest URLs.
+
 - `dc help`
   Show the command help menu.
 

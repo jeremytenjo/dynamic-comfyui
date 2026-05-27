@@ -145,6 +145,8 @@ Run this command in the terminal to uninstall the dynamic-comfyui runtime packag
 
 Run this command in the terminal to print runtime/GPU versions and memory info `dynamic-comfyui system-info`
 
+Run this command in the terminal to list session project manifest URLs `dynamic-comfyui deps-ls`
+
 Run this command in the terminal to list available commands `dynamic-comfyui help`
 """
 
@@ -1099,3 +1101,31 @@ def cmd_system_info(ctx: RuntimeContext) -> None:
     detected_comfyui = discover_comfyui_workspace(network_volume)
     info = collect_system_info(detected_comfyui)
     print_system_info(info)
+
+
+def cmd_deps_ls(_ctx: RuntimeContext) -> None:
+    configure_process_env()
+    network_volume = set_network_volume_default(_ctx.network_volume)
+    detected_comfyui = discover_comfyui_workspace(network_volume)
+    if detected_comfyui is not None:
+        detected_volume = detected_comfyui.parent
+        if detected_volume != network_volume:
+            print_info(f"Detected ComfyUI workspace at {detected_comfyui}. Using {detected_volume} as workspace root.")
+        network_volume = detected_volume
+    else:
+        print_warning(f"Could not auto-detect ComfyUI workspace. Using configured workspace root: {network_volume}")
+
+    settings_volume = _settings_network_volume(_ctx)
+    try:
+        _saved_key, saved_source_url = load_project_state(network_volume)
+    except Exception:
+        saved_source_url = ""
+    default_manifest_url = read_default_manifest_url_override(settings_volume, fallback_network_volume=network_volume) or ""
+
+    print_rule("Session Project URLs")
+    if saved_source_url:
+        print(f"project_url\t{saved_source_url}")
+    if default_manifest_url:
+        print(f"default_manifest_url\t{default_manifest_url}")
+    if not saved_source_url and not default_manifest_url:
+        print("(none)")

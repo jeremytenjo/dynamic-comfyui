@@ -17,6 +17,7 @@ from .runtime.operations import (
     cmd_restart,
     cmd_set_default_manifest_url,
     cmd_stop,
+    cmd_deps_ls,
     cmd_start,
     cmd_start_new_project,
     cmd_system_info,
@@ -114,6 +115,9 @@ def _help_text() -> str:
 
 - dc help
   Show this help menu.
+
+- dc deps-ls
+  List session project manifest URLs.
 """
 
 
@@ -134,6 +138,7 @@ def build_parser() -> argparse.ArgumentParser:
         "update-dc",
         "uninstall-dc",
         "system-info",
+        "deps-ls",
         "help",
     ):
         subparsers.add_parser(cmd)
@@ -184,6 +189,7 @@ def main() -> None:
         "update-dc": cmd_update_dc,
         "uninstall-dc": cmd_uninstall_dc,
         "system-info": cmd_system_info,
+        "deps-ls": cmd_deps_ls,
     }
 
     try:

@@ -28,6 +28,11 @@ class CliParserTests(unittest.TestCase):
         args = parser.parse_args(["clear-default-manifest-url"])
         self.assertEqual(args.command, "clear-default-manifest-url")
 
+    def test_deps_ls(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["deps-ls"])
+        self.assertEqual(args.command, "deps-ls")
+
 
 if __name__ == "__main__":
     unittest.main()
