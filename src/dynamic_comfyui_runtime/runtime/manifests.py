@@ -50,6 +50,10 @@ def project_state_path(network_volume: Path) -> Path:
     return network_volume / ".dynamic-comfyui_selected_project"
 
 
+def project_url_history_path(network_volume: Path) -> Path:
+    return network_volume / ".dynamic-comfyui_project_urls"
+
+
 def _parse_manifest(path: Path) -> ManifestData:
     data = read_json(path)
 
@@ -174,6 +178,34 @@ def load_project_state(network_volume: Path) -> tuple[str, str]:
     # `key<TAB>manifest_path<TAB>source_url`.
     source_url = parts[2].strip() if len(parts) > 2 else (parts[1].strip() if len(parts) > 1 else "")
     return key, source_url
+
+
+def append_project_url_history(network_volume: Path, source_url: str) -> None:
+    normalized = source_url.strip()
+    if not normalized:
+        return
+    ensure_dir(network_volume)
+    existing = load_project_url_history(network_volume)
+    if normalized in existing:
+        return
+    history_path = project_url_history_path(network_volume)
+    with history_path.open("a", encoding="utf-8") as handle:
+        handle.write(f"{normalized}\n")
+
+
+def load_project_url_history(network_volume: Path) -> list[str]:
+    history_path = project_url_history_path(network_volume)
+    if not history_path.is_file():
+        return []
+    urls: list[str] = []
+    seen: set[str] = set()
+    for raw in history_path.read_text(encoding="utf-8").splitlines():
+        value = raw.strip()
+        if not value or value in seen:
+            continue
+        seen.add(value)
+        urls.append(value)
+    return urls
 
 
 def normalize_manifest_url(url: str) -> str:

@@ -33,8 +33,10 @@ from .hooks import (
 from .manifests import (
     FileSpec,
     MergedManifest,
+    append_project_url_history,
     download_manifest,
     load_manifest_data,
+    load_project_url_history,
     load_project_state,
     merge_manifests,
     normalize_manifest_url,
@@ -712,6 +714,7 @@ def cmd_install(ctx: RuntimeContext) -> None:
 def _save_selected_project(network_volume: Path, manifest_path: Path, source_url: str) -> None:
     _ = manifest_path
     save_project_state(network_volume, "active-project", source_url)
+    append_project_url_history(network_volume, source_url)
     print_success("Selected project: active-project")
 
 
@@ -1120,12 +1123,15 @@ def cmd_deps_ls(_ctx: RuntimeContext) -> None:
         _saved_key, saved_source_url = load_project_state(network_volume)
     except Exception:
         saved_source_url = ""
+    saved_history_urls = load_project_url_history(network_volume)
+    if saved_source_url and saved_source_url not in saved_history_urls:
+        saved_history_urls.append(saved_source_url)
     default_manifest_url = read_default_manifest_url_override(settings_volume, fallback_network_volume=network_volume) or ""
 
     print_rule("Session Project URLs")
-    if saved_source_url:
-        print(f"project_url\t{saved_source_url}")
+    for project_url in saved_history_urls:
+        print(f"project_url\t{project_url}")
     if default_manifest_url:
         print(f"default_manifest_url\t{default_manifest_url}")
-    if not saved_source_url and not default_manifest_url:
+    if not saved_history_urls and not default_manifest_url:
         print("(none)")

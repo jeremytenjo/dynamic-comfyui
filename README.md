@@ -66,7 +66,7 @@ Define project manifests (custom nodes + files) for repeatable ComfyUI setup on 
   Print ComfyUI/frontend/Python/PyTorch/CUDA/GPU/RAM version information.
 
 - `dc deps-ls`
-  List session project manifest URLs.
+  List all session project manifest URLs used so far.
   Aliases: `dc project-ls`, `dc projects-ls`.
 
 - `dc help`
