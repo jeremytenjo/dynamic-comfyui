@@ -28,7 +28,6 @@ from .hooks import (
     HookedManifest,
     collect_on_install_complete_commands,
     confirm_and_run_on_install_complete_commands,
-    run_on_install_complete_commands,
     validate_no_overriding_hook_conflicts,
 )
 from .manifests import (
@@ -757,7 +756,7 @@ def cmd_start(ctx: RuntimeContext, project_url: str | None = None) -> None:
     try:
         if on_install_complete_commands:
             run_dependency_install_flow(ctx, manifest_path)
-            run_on_install_complete_commands(on_install_complete_commands, cwd=network_volume)
+            confirm_and_run_on_install_complete_commands(on_install_complete_commands, cwd=network_volume)
         else:
             run_comfyui_install_flow(ctx, manifest_path)
     except Exception as exc:
