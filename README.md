@@ -67,6 +67,7 @@ Define project manifests (custom nodes + files) for repeatable ComfyUI setup on 
 
 - `dc deps-ls`
   List session project manifest URLs.
+  Aliases: `dc project-ls`, `dc projects-ls`.
 
 - `dc help`
   Show the command help menu.

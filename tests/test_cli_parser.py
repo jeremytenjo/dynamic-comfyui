@@ -33,6 +33,16 @@ class CliParserTests(unittest.TestCase):
         args = parser.parse_args(["deps-ls"])
         self.assertEqual(args.command, "deps-ls")
 
+    def test_project_ls_alias(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["project-ls"])
+        self.assertEqual(args.command, "project-ls")
+
+    def test_projects_ls_alias(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["projects-ls"])
+        self.assertEqual(args.command, "projects-ls")
+
 
 if __name__ == "__main__":
     unittest.main()

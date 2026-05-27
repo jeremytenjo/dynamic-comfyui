@@ -118,6 +118,9 @@ def _help_text() -> str:
 
 - dc deps-ls
   List session project manifest URLs.
+
+- dc project-ls / dc projects-ls
+  Alias for `dc deps-ls`.
 """
 
 
@@ -139,6 +142,8 @@ def build_parser() -> argparse.ArgumentParser:
         "uninstall-dc",
         "system-info",
         "deps-ls",
+        "project-ls",
+        "projects-ls",
         "help",
     ):
         subparsers.add_parser(cmd)
@@ -190,6 +195,8 @@ def main() -> None:
         "uninstall-dc": cmd_uninstall_dc,
         "system-info": cmd_system_info,
         "deps-ls": cmd_deps_ls,
+        "project-ls": cmd_deps_ls,
+        "projects-ls": cmd_deps_ls,
     }
 
     try:
