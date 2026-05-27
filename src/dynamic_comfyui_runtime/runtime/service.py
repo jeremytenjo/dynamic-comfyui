@@ -298,6 +298,8 @@ def start_comfyui_service(comfyui_dir: Path, network_volume: Path, install_start
         ],
         cwd=comfyui_dir,
         quiet=True,
+        timeout=60,
+        input_text="\n",
     )
 
     try:
