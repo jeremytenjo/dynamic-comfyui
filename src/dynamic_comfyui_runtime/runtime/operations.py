@@ -59,6 +59,7 @@ from .service import (
     set_model_directories,
     set_network_volume_default,
     start_comfyui_service,
+    start_comfyui_service_foreground,
     start_comfyui_service_for_restart,
     stop_comfyui_service,
     verify_comfyui_core_workspace,
@@ -634,6 +635,25 @@ def run_comfyui_install_flow(ctx: RuntimeContext, project_manifest_path: Path) -
         print_info(line)
 
 
+def run_comfyui_install_flow_foreground(ctx: RuntimeContext, project_manifest_path: Path) -> None:
+    ctx.install_start_ts = now_epoch()
+    clear_install_sentinel(set_network_volume_default(ctx.network_volume))
+    execution = _execute_dependency_install(ctx, project_manifest_path, manager_quiet=False)
+
+    write_install_sentinel(execution.network_volume, execution.comfyui_dir)
+    mark_done(execution.merged, execution.comfyui_dir)
+    _print_resource_summary(
+        execution.merged,
+        execution.custom_nodes_dir,
+        execution.comfyui_dir,
+        execution.node_failures,
+        execution.file_failures,
+    )
+    start_comfyui_service_foreground(
+        execution.comfyui_dir, execution.network_volume, install_start_ts=ctx.install_start_ts
+    )
+
+
 def _dependency_completion_message(ctx: RuntimeContext) -> str:
     if ctx.install_start_ts is None:
         return "Dependency installation complete."
@@ -762,8 +782,12 @@ def cmd_start(ctx: RuntimeContext, project_url: str | None = None) -> None:
         if on_install_complete_commands:
             run_dependency_install_flow(ctx, manifest_path)
             confirm_and_run_on_install_complete_commands(on_install_complete_commands, cwd=network_volume)
+            comfyui_dir, _ = ensure_comfyui_workspace(network_volume)
+            start_comfyui_service_foreground(
+                comfyui_dir, network_volume, install_start_ts=ctx.install_start_ts
+            )
         else:
-            run_comfyui_install_flow(ctx, manifest_path)
+            run_comfyui_install_flow_foreground(ctx, manifest_path)
     except Exception as exc:
         comfyui_dir, _ = ensure_comfyui_workspace(network_volume)
         mark_failed(None, comfyui_dir, f"Installation failed. {exc}")

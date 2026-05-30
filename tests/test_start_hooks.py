@@ -40,7 +40,13 @@ class StartHooksTests(unittest.TestCase):
                 patch("dynamic_comfyui_runtime.runtime.operations.prompt_and_prepare_project_manifest") as prompt_manifest,
                 patch("dynamic_comfyui_runtime.runtime.operations._save_selected_project"),
                 patch("dynamic_comfyui_runtime.runtime.operations.run_dependency_install_flow") as run_dependency_install,
-                patch("dynamic_comfyui_runtime.runtime.operations.run_comfyui_install_flow") as run_comfyui_install,
+                patch(
+                    "dynamic_comfyui_runtime.runtime.operations.start_comfyui_service_foreground"
+                ) as run_comfyui_foreground,
+                patch(
+                    "dynamic_comfyui_runtime.runtime.operations.ensure_comfyui_workspace",
+                    return_value=(root / "ComfyUI", root / "ComfyUI" / "custom_nodes"),
+                ),
                 patch(
                     "dynamic_comfyui_runtime.runtime.operations.confirm_and_run_on_install_complete_commands"
                 ) as confirm_and_run_hooks,
@@ -49,8 +55,8 @@ class StartHooksTests(unittest.TestCase):
 
             prompt_manifest.assert_not_called()
             run_dependency_install.assert_called_once_with(ctx, saved_manifest)
-            run_comfyui_install.assert_not_called()
             confirm_and_run_hooks.assert_called_once_with(["echo saved"], cwd=root)
+            run_comfyui_foreground.assert_called_once()
 
     def test_start_runs_on_install_complete_confirmation_when_project_url_is_provided(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -70,7 +76,13 @@ class StartHooksTests(unittest.TestCase):
                 ),
                 patch("dynamic_comfyui_runtime.runtime.operations._save_selected_project"),
                 patch("dynamic_comfyui_runtime.runtime.operations.run_dependency_install_flow") as run_dependency_install,
-                patch("dynamic_comfyui_runtime.runtime.operations.run_comfyui_install_flow") as run_comfyui_install,
+                patch(
+                    "dynamic_comfyui_runtime.runtime.operations.start_comfyui_service_foreground"
+                ) as run_comfyui_foreground,
+                patch(
+                    "dynamic_comfyui_runtime.runtime.operations.ensure_comfyui_workspace",
+                    return_value=(root / "ComfyUI", root / "ComfyUI" / "custom_nodes"),
+                ),
                 patch(
                     "dynamic_comfyui_runtime.runtime.operations.confirm_and_run_on_install_complete_commands"
                 ) as confirm_and_run_hooks,
@@ -78,10 +90,10 @@ class StartHooksTests(unittest.TestCase):
                 cmd_start(ctx, "https://example.com/provided.json")
 
             run_dependency_install.assert_called_once_with(ctx, provided_manifest)
-            run_comfyui_install.assert_not_called()
             confirm_and_run_hooks.assert_called_once_with(["echo provided"], cwd=root)
+            run_comfyui_foreground.assert_called_once()
 
-    def test_start_uses_comfyui_install_flow_when_manifest_has_no_hook_commands(self) -> None:
+    def test_start_uses_foreground_comfyui_install_flow_when_manifest_has_no_hook_commands(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             ctx = self._ctx(root)
@@ -96,7 +108,9 @@ class StartHooksTests(unittest.TestCase):
                 ),
                 patch("dynamic_comfyui_runtime.runtime.operations._save_selected_project"),
                 patch("dynamic_comfyui_runtime.runtime.operations.run_dependency_install_flow") as run_dependency_install,
-                patch("dynamic_comfyui_runtime.runtime.operations.run_comfyui_install_flow") as run_comfyui_install,
+                patch(
+                    "dynamic_comfyui_runtime.runtime.operations.run_comfyui_install_flow_foreground"
+                ) as run_comfyui_install,
                 patch(
                     "dynamic_comfyui_runtime.runtime.operations.confirm_and_run_on_install_complete_commands"
                 ) as confirm_and_run_hooks,

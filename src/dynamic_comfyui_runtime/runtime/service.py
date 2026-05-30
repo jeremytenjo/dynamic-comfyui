@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import re
+import signal
 import shutil
 import subprocess
 import time
@@ -421,6 +422,64 @@ def start_comfyui_service_for_restart(comfyui_dir: Path, network_volume: Path) -
         return start_comfyui_service_via_main_py(comfyui_dir)
 
     raise RuntimeError(f"Cannot restart ComfyUI: missing comfy-cli and main.py not found at {main_py}")
+
+
+def start_comfyui_service_foreground(
+    comfyui_dir: Path, network_volume: Path, install_start_ts: int | None = None
+) -> None:
+    _ = install_start_ts
+    health_url = "http://127.0.0.1:8188/system_stats"
+    if is_http_reachable(health_url):
+        print("ComfyUI is already running; restarting in foreground.")
+    else:
+        print("Ensuring no stale ComfyUI background service is running before launch.")
+
+    stop_comfyui_service(comfyui_dir)
+    stop_setup_page_server()
+    _apply_flash_attn_runtime_hotfix()
+    sanitize_torch_cuda_alloc_conf()
+    _ensure_manager_runtime_ready(comfyui_dir, network_volume)
+
+    main_py = comfyui_dir / "main.py"
+    if not comfyui_dir.is_dir():
+        raise RuntimeError(f"ComfyUI workspace directory does not exist: {comfyui_dir}")
+    if not main_py.is_file():
+        raise RuntimeError(f"ComfyUI main.py not found in workspace: {main_py}")
+
+    runpod_url = resolve_runpod_proxy_url(8188)
+    gui_url = runpod_url if runpod_url else "http://127.0.0.1:8188"
+    print(f"Starting ComfyUI in foreground via main.py (cwd: {comfyui_dir})")
+    print(f"ComfyUI URL: {gui_url}")
+    print("Press Ctrl+C to stop ComfyUI.")
+
+    python_cmd = "python" if command_exists("python") else "python3"
+    proc = subprocess.Popen(  # noqa: S603
+        [
+            python_cmd,
+            "main.py",
+            "--listen",
+            "0.0.0.0",
+            "--port",
+            "8188",
+            "--enable-manager",
+            "--disable-cuda-malloc",
+            "--cache-none",
+            "--mmap-torch-files",
+        ],
+        cwd=str(comfyui_dir),
+    )
+    try:
+        returncode = proc.wait()
+    except KeyboardInterrupt:
+        proc.send_signal(signal.SIGINT)
+        try:
+            proc.wait(timeout=10)
+        except Exception:
+            proc.kill()
+            proc.wait()
+        raise
+    if returncode != 0:
+        raise RuntimeError(f"ComfyUI foreground process exited with code {returncode}")
 
 
 def prepare_network_volume_and_start_jupyter(network_volume: Path) -> Path:
