@@ -278,6 +278,11 @@ def _wait_for_comfyui_ready(metric_start: int, *, log_path: Path | None = None) 
     raise RuntimeError(details)
 
 
+def _is_runtime_error_failure(exc: Exception) -> bool:
+    message = str(exc).lower()
+    return "runtimeerror:" in message or message.startswith("runtimeerror")
+
+
 def start_comfyui_service(comfyui_dir: Path, network_volume: Path, install_start_ts: int | None = None) -> list[str]:
     now = int(time.time())
     metric_start = install_start_ts if install_start_ts and install_start_ts <= now else now
@@ -317,6 +322,8 @@ def start_comfyui_service(comfyui_dir: Path, network_volume: Path, install_start
             input_text="\n",
         )
     except Exception as exc:
+        if _is_runtime_error_failure(exc):
+            raise RuntimeError(f"comfy-cli launch failed with runtime error: {exc}") from exc
         main_py = comfyui_dir / "main.py"
         if main_py.is_file():
             print(f"comfy-cli launch failed ({exc}). Falling back to `python main.py --listen 0.0.0.0 --port 8188`.")
@@ -390,6 +397,8 @@ def start_comfyui_service_for_restart(comfyui_dir: Path, network_volume: Path) -
         try:
             return start_comfyui_service(comfyui_dir, network_volume)
         except Exception as exc:
+            if _is_runtime_error_failure(exc):
+                raise
             if main_py.is_file():
                 print(f"comfy-cli launch failed ({exc}). Falling back to `python main.py --listen 0.0.0.0 --port 8188`.")
                 return start_comfyui_service_via_main_py(comfyui_dir)
