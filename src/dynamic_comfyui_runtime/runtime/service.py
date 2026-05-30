@@ -244,7 +244,16 @@ def resolve_runpod_proxy_url(target_port: int) -> str | None:
     return None
 
 
-def _wait_for_comfyui_ready(metric_start: int) -> list[str]:
+def _read_log_tail(path: Path, *, max_chars: int = 4000) -> str:
+    if not path.is_file():
+        return ""
+    try:
+        return path.read_text(encoding="utf-8", errors="replace")[-max_chars:].strip()
+    except Exception:
+        return ""
+
+
+def _wait_for_comfyui_ready(metric_start: int, *, log_path: Path | None = None) -> list[str]:
     health_url = "http://127.0.0.1:8188/system_stats"
     startup_lines: list[str] = []
     max_wait = 90
@@ -261,7 +270,12 @@ def _wait_for_comfyui_ready(metric_start: int) -> list[str]:
         print("ComfyUI starting...")
         time.sleep(2)
         waited += 2
-    raise RuntimeError("ComfyUI failed to become ready within 90s")
+    details = "ComfyUI failed to become ready within 90s"
+    if log_path is not None:
+        tail = _read_log_tail(log_path)
+        if tail:
+            details = f"{details}\nLast startup log lines ({log_path}):\n{tail}"
+    raise RuntimeError(details)
 
 
 def start_comfyui_service(comfyui_dir: Path, network_volume: Path, install_start_ts: int | None = None) -> list[str]:
@@ -358,7 +372,7 @@ def start_comfyui_service_via_main_py(comfyui_dir: Path, install_start_ts: int |
         )
 
     try:
-        return _wait_for_comfyui_ready(metric_start)
+        return _wait_for_comfyui_ready(metric_start, log_path=log_path)
     except Exception:
         stop_comfyui_service(comfyui_dir)
         raise
