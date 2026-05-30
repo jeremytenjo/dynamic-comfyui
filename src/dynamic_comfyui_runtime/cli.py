@@ -81,7 +81,8 @@ def _help_text() -> str:
   Clear your configured default resources manifest URL. Defaults become empty again.
 
 - dc start
-  Enter a direct JSON URL (or press Enter for defaults-only) and install/start ComfyUI.
+  Start or restart ComfyUI immediately.
+  Provide a JSON URL to install that project first, then start ComfyUI.
   Usage: dc start [project_json_url]
 
 - dc start-new-project

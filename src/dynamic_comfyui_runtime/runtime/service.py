@@ -18,6 +18,7 @@ from .common import (
     sanitize_torch_cuda_alloc_conf,
 )
 from .progress import stop_setup_page_server
+from .ui import print_info
 
 
 def _looks_like_comfyui_workspace(path: Path) -> bool:
@@ -449,7 +450,7 @@ def start_comfyui_service_foreground(
     runpod_url = resolve_runpod_proxy_url(8188)
     gui_url = runpod_url if runpod_url else "http://127.0.0.1:8188"
     print(f"Starting ComfyUI in foreground via main.py (cwd: {comfyui_dir})")
-    print(f"ComfyUI URL: {gui_url}")
+    print_info(f"ComfyUI URL: [url]{gui_url}[/]")
     print("Press Ctrl+C to stop ComfyUI.")
 
     python_cmd = "python" if command_exists("python") else "python3"

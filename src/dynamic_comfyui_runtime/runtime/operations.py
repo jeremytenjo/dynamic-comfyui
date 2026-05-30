@@ -118,7 +118,7 @@ Save your character lora in the /ComfyUI/models/lora folder.
 
 Usage:
 
-Run this command in the terminal to start ComfyUI. First step: enter your direct JSON URL `dynamic-comfyui start`
+Run this command in the terminal to start ComfyUI `dynamic-comfyui start`
 
 Run this command in the terminal to switch projects. First step: enter your direct JSON URL `dynamic-comfyui start-new-project`
 
@@ -741,42 +741,19 @@ def _save_selected_project(network_volume: Path, manifest_path: Path, source_url
 def cmd_start(ctx: RuntimeContext, project_url: str | None = None) -> None:
     configure_process_env()
     network_volume = set_network_volume_default(ctx.network_volume)
-    on_install_complete_commands: list[str] = []
-    if project_url is not None:
-        manifest_path, source_url = prepare_project_manifest(network_volume, project_url)
-    else:
-        reused_saved_project = False
-        try:
-            _saved_key, saved_source_url = load_project_state(network_volume)
-        except Exception:
-            saved_source_url = ""
+    if project_url is None:
+        comfyui_dir, _ = ensure_comfyui_workspace(network_volume)
+        startup_lines = start_comfyui_service_for_restart(comfyui_dir, network_volume)
+        for line in startup_lines:
+            print_info(line)
+        return
 
-        if saved_source_url:
-            saved_manifest_path, saved_manifest_source_url = prepare_project_manifest(network_volume, saved_source_url)
-            saved_manifest_data = load_manifest_data(saved_manifest_path)
-            saved_hook = saved_manifest_data.hooks.on_install_complete
-            if saved_hook is not None and saved_hook.commands:
-                manifest_path, source_url = saved_manifest_path, saved_manifest_source_url
-                on_install_complete_commands = list(saved_hook.commands)
-                reused_saved_project = True
-                print_info(
-                    "Reusing saved project URL because it defines hooks.on_install_complete. "
-                    "Run 'dynamic-comfyui start <project-json-url>' to override."
-                )
-            else:
-                manifest_path, source_url = prompt_and_prepare_project_manifest(network_volume)
-        else:
-            manifest_path, source_url = prompt_and_prepare_project_manifest(network_volume)
-        if not reused_saved_project:
-            parsed_manifest_data = load_manifest_data(manifest_path)
-            parsed_hook = parsed_manifest_data.hooks.on_install_complete
-            if parsed_hook is not None:
-                on_install_complete_commands = list(parsed_hook.commands)
-    if project_url is not None:
-        parsed_manifest_data = load_manifest_data(manifest_path)
-        parsed_hook = parsed_manifest_data.hooks.on_install_complete
-        if parsed_hook is not None:
-            on_install_complete_commands = list(parsed_hook.commands)
+    on_install_complete_commands: list[str] = []
+    manifest_path, source_url = prepare_project_manifest(network_volume, project_url)
+    parsed_manifest_data = load_manifest_data(manifest_path)
+    parsed_hook = parsed_manifest_data.hooks.on_install_complete
+    if parsed_hook is not None:
+        on_install_complete_commands = list(parsed_hook.commands)
     _save_selected_project(network_volume, manifest_path, source_url)
     try:
         if on_install_complete_commands:

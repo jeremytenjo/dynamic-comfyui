@@ -38,7 +38,8 @@ Define project manifests (custom nodes + files) for repeatable ComfyUI setup on 
   Clear your configured default resources manifest URL (defaults become empty).
 
 - `dc start`
-  Enter a JSON URL (or press Enter for defaults-only), then install/start ComfyUI.
+  Start or restart ComfyUI immediately.
+  Optionally pass a JSON URL to install that project first, then start ComfyUI.
 
 - `dc start-new-project`
   Enter a new JSON URL (or press Enter for defaults-only) and optionally remove previous project resources.
