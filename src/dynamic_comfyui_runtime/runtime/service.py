@@ -267,6 +267,10 @@ def _wait_for_comfyui_ready(metric_start: int, *, log_path: Path | None = None) 
             gui_url = runpod_url if runpod_url else "http://127.0.0.1:8188"
             startup_lines.append(f"ComfyUI running: [url]{gui_url}[/] ({startup_time})")
             return startup_lines
+        if log_path is not None:
+            tail = _read_log_tail(log_path)
+            if "runtimeerror:" in tail.lower():
+                raise RuntimeError(f"ComfyUI runtime error during startup:\n{tail}")
         print("ComfyUI starting...")
         time.sleep(2)
         waited += 2
@@ -300,35 +304,43 @@ def start_comfyui_service(comfyui_dir: Path, network_volume: Path, install_start
     _ensure_manager_runtime_ready(comfyui_dir, network_volume)
 
     print("Starting ComfyUI via comfy-cli")
-    try:
-        run(
-            [
-                "comfy",
-                "--workspace",
-                str(comfyui_dir),
-                "launch",
-                "--background",
-                "--",
-                "--listen",
-                "0.0.0.0",
-                "--enable-manager",
-                "--disable-cuda-malloc",
-                "--cache-none",
-                "--mmap-torch-files",
-            ],
-            cwd=comfyui_dir,
-            quiet=True,
-            timeout=60,
-            input_text="\n",
+    launch = run(
+        [
+            "comfy",
+            "--workspace",
+            str(comfyui_dir),
+            "launch",
+            "--background",
+            "--",
+            "--listen",
+            "0.0.0.0",
+            "--enable-manager",
+            "--disable-cuda-malloc",
+            "--cache-none",
+            "--mmap-torch-files",
+        ],
+        cwd=comfyui_dir,
+        quiet=True,
+        timeout=60,
+        input_text="\n",
+        check=False,
+    )
+    if launch.returncode != 0:
+        stdout_text = launch.stdout or ""
+        stderr_text = launch.stderr or ""
+        combined = f"{stdout_text}\n{stderr_text}".strip()
+        if "runtimeerror:" in combined.lower():
+            raise RuntimeError(f"comfy-cli launch failed with runtime error: {combined[-4000:]}")
+        exc = RuntimeError(
+            f"Command failed ({launch.returncode}): comfy launch"
+            + (f" (stderr: {stderr_text[-600:]})" if stderr_text else "")
+            + (f" (stdout: {stdout_text[-600:]})" if stdout_text else "")
         )
-    except Exception as exc:
-        if _is_runtime_error_failure(exc):
-            raise RuntimeError(f"comfy-cli launch failed with runtime error: {exc}") from exc
         main_py = comfyui_dir / "main.py"
         if main_py.is_file():
             print(f"comfy-cli launch failed ({exc}). Falling back to `python main.py --listen 0.0.0.0 --port 8188`.")
             return start_comfyui_service_via_main_py(comfyui_dir, install_start_ts=install_start_ts)
-        raise
+        raise exc
 
     try:
         return _wait_for_comfyui_ready(metric_start)
