@@ -281,26 +281,33 @@ def start_comfyui_service(comfyui_dir: Path, network_volume: Path, install_start
     _ensure_manager_runtime_ready(comfyui_dir, network_volume)
 
     print("Starting ComfyUI via comfy-cli")
-    run(
-        [
-            "comfy",
-            "--workspace",
-            str(comfyui_dir),
-            "launch",
-            "--background",
-            "--",
-            "--listen",
-            "0.0.0.0",
-            "--enable-manager",
-            "--disable-cuda-malloc",
-            "--cache-none",
-            "--mmap-torch-files",
-        ],
-        cwd=comfyui_dir,
-        quiet=True,
-        timeout=60,
-        input_text="\n",
-    )
+    try:
+        run(
+            [
+                "comfy",
+                "--workspace",
+                str(comfyui_dir),
+                "launch",
+                "--background",
+                "--",
+                "--listen",
+                "0.0.0.0",
+                "--enable-manager",
+                "--disable-cuda-malloc",
+                "--cache-none",
+                "--mmap-torch-files",
+            ],
+            cwd=comfyui_dir,
+            quiet=True,
+            timeout=60,
+            input_text="\n",
+        )
+    except Exception as exc:
+        main_py = comfyui_dir / "main.py"
+        if main_py.is_file():
+            print(f"comfy-cli launch failed ({exc}). Falling back to `python main.py --listen 0.0.0.0 --port 8188`.")
+            return start_comfyui_service_via_main_py(comfyui_dir, install_start_ts=install_start_ts)
+        raise
 
     try:
         return _wait_for_comfyui_ready(metric_start)
