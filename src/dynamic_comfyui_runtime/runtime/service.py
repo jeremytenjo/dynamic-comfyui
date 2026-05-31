@@ -284,11 +284,6 @@ def _wait_for_comfyui_ready(metric_start: int, *, log_path: Path | None = None) 
     raise RuntimeError(details)
 
 
-def _is_runtime_error_failure(exc: Exception) -> bool:
-    message = str(exc).lower()
-    return "runtimeerror:" in message or message.startswith("runtimeerror")
-
-
 def start_comfyui_service(comfyui_dir: Path, network_volume: Path, install_start_ts: int | None = None) -> list[str]:
     now = int(time.time())
     metric_start = install_start_ts if install_start_ts and install_start_ts <= now else now
@@ -397,32 +392,6 @@ def start_comfyui_service_via_main_py(comfyui_dir: Path, install_start_ts: int |
     except Exception:
         stop_comfyui_service(comfyui_dir)
         raise
-
-
-def start_comfyui_service_for_restart(comfyui_dir: Path, network_volume: Path) -> list[str]:
-    main_py = comfyui_dir / "main.py"
-
-    if is_main_py_listen_process_running():
-        print("Detected running main.py listen process. Restarting via `python main.py --listen 0.0.0.0 --port 8188`.")
-        return start_comfyui_service_via_main_py(comfyui_dir)
-
-    if command_exists("comfy"):
-        ensure_comfy_cli_ready(network_volume)
-        try:
-            return start_comfyui_service(comfyui_dir, network_volume)
-        except Exception as exc:
-            if _is_runtime_error_failure(exc):
-                raise
-            if main_py.is_file():
-                print(f"comfy-cli launch failed ({exc}). Falling back to `python main.py --listen 0.0.0.0 --port 8188`.")
-                return start_comfyui_service_via_main_py(comfyui_dir)
-            raise
-
-    if main_py.is_file():
-        print("comfy-cli not found. Falling back to `python main.py --listen 0.0.0.0 --port 8188`.")
-        return start_comfyui_service_via_main_py(comfyui_dir)
-
-    raise RuntimeError(f"Cannot restart ComfyUI: missing comfy-cli and main.py not found at {main_py}")
 
 
 def start_comfyui_service_foreground(

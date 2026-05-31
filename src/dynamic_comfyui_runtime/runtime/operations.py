@@ -60,7 +60,6 @@ from .service import (
     set_network_volume_default,
     start_comfyui_service,
     start_comfyui_service_foreground,
-    start_comfyui_service_for_restart,
     stop_comfyui_service,
     verify_comfyui_core_workspace,
     resolve_runpod_proxy_url,
@@ -743,9 +742,7 @@ def cmd_start(ctx: RuntimeContext, project_url: str | None = None) -> None:
     network_volume = set_network_volume_default(ctx.network_volume)
     if project_url is None:
         comfyui_dir, _ = ensure_comfyui_workspace(network_volume)
-        startup_lines = start_comfyui_service_for_restart(comfyui_dir, network_volume)
-        for line in startup_lines:
-            print_info(line)
+        start_comfyui_service_foreground(comfyui_dir, network_volume)
         return
 
     on_install_complete_commands: list[str] = []
@@ -1064,10 +1061,7 @@ def cmd_restart(ctx: RuntimeContext) -> None:
         comfyui_dir, _ = ensure_comfyui_workspace(network_volume)
 
     print_rule("Restart ComfyUI")
-    startup_lines = start_comfyui_service_for_restart(comfyui_dir, network_volume)
-    for line in startup_lines:
-        print_info(line)
-    print_success("ComfyUI restart complete.")
+    start_comfyui_service_foreground(comfyui_dir, network_volume)
 
 
 def cmd_stop(ctx: RuntimeContext) -> None:
