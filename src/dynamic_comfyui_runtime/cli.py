@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 from pathlib import Path
 
-from .runtime.ui import print_error, setup_rich_runtime
+from .runtime.ui import print_error, print_info, setup_rich_runtime
 from .runtime.operations import (
     RuntimeContext,
     cmd_add_project,
@@ -26,6 +27,47 @@ from .runtime.operations import (
     cmd_update_nodes_and_models,
 )
 from .runtime.updater import REEXEC_FLAG, upgrade_runtime_package_and_reexec_install
+
+
+COMMANDS: tuple[str, ...] = (
+    "install",
+    "install-default-deps",
+    "start-new-project",
+    "add-project",
+    "replace-project",
+    "clear-default-manifest-url",
+    "update-nodes-and-models",
+    "restart",
+    "stop",
+    "update-dc",
+    "uninstall-dc",
+    "system-info",
+    "deps-ls",
+    "project-ls",
+    "projects-ls",
+    "help",
+    "start",
+    "install-deps",
+    "remove-deps",
+    "set-default-manifest-url",
+)
+
+
+class RuntimeArgumentParser(argparse.ArgumentParser):
+    def error(self, message: str) -> None:
+        if "invalid choice" in message and "command" in message:
+            invalid_value = "<unknown>"
+            match = re.search(r"invalid choice: (.+?)\s+\(choose from", message)
+            if match:
+                invalid_value = match.group(1).strip()
+            print_error(f"Error: invalid command {invalid_value}.")
+            print_info("Available commands:")
+            for command in COMMANDS:
+                print_info(f"  - {command}")
+            print_info("Run `dynamic-comfyui help` for command usage details.")
+        else:
+            print_error(f"Error: {message}")
+        raise SystemExit(2)
 
 
 def _repo_root() -> Path:
@@ -126,27 +168,12 @@ def _help_text() -> str:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="dynamic-comfyui")
+    parser = RuntimeArgumentParser(prog="dynamic-comfyui")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    for cmd in (
-        "install",
-        "install-default-deps",
-        "start-new-project",
-        "add-project",
-        "replace-project",
-        "clear-default-manifest-url",
-        "update-nodes-and-models",
-        "restart",
-        "stop",
-        "update-dc",
-        "uninstall-dc",
-        "system-info",
-        "deps-ls",
-        "project-ls",
-        "projects-ls",
-        "help",
-    ):
+    for cmd in COMMANDS:
+        if cmd in ("start", "install-deps", "remove-deps", "set-default-manifest-url"):
+            continue
         subparsers.add_parser(cmd)
 
     start_parser = subparsers.add_parser("start")
