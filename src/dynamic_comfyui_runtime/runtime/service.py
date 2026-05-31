@@ -17,6 +17,7 @@ from .common import (
     run,
     sanitize_torch_cuda_alloc_conf,
 )
+from .jupyter_permissions import ensure_jupyter_delete_permissions
 from .progress import stop_setup_page_server
 from .ui import print_info
 
@@ -74,7 +75,7 @@ def discover_comfyui_workspace(network_volume: Path) -> Path | None:
 def set_network_volume_default(network_volume: Path) -> Path:
     if network_volume.is_dir():
         return network_volume
-    print(f"NETWORK_VOLUME directory '{network_volume}' does not exist. Using '/' as fallback.")
+    print_info(f"NETWORK_VOLUME directory '{network_volume}' does not exist. Using '/' as fallback.")
     return Path("/")
 
 
@@ -456,7 +457,7 @@ def prepare_network_volume_and_start_jupyter(network_volume: Path) -> Path:
     notebook_dir = Path("/workspace")
     actual = network_volume
     if not actual.is_dir():
-        print(f"NETWORK_VOLUME directory '{network_volume}' does not exist. Using '/' as fallback.")
+        print_info(f"NETWORK_VOLUME directory '{network_volume}' does not exist. Using '/' as fallback.")
         actual = Path("/")
         notebook_dir = Path("/")
 
@@ -469,7 +470,8 @@ def prepare_network_volume_and_start_jupyter(network_volume: Path) -> Path:
 
     log_path = Path("/tmp/dynamic-comfyui-jupyter.log")
     log_path.unlink(missing_ok=True)
-    print(f"Starting JupyterLab on 0.0.0.0:8888 (root: {notebook_dir})")
+    ensure_jupyter_delete_permissions(notebook_dir=notebook_dir)
+    print_info(f"Starting JupyterLab on 0.0.0.0:8888 (root: {notebook_dir})")
 
     with log_path.open("w", encoding="utf-8") as log_file:
         proc = subprocess.Popen(  # noqa: S603
@@ -496,7 +498,7 @@ def prepare_network_volume_and_start_jupyter(network_volume: Path) -> Path:
             tail = log_path.read_text(encoding="utf-8")[-4000:] if log_path.is_file() else ""
             raise RuntimeError(f"JupyterLab process exited during startup.\n{tail}")
         if is_http_reachable("http://127.0.0.1:8888/lab"):
-            print("JupyterLab is ready on port 8888.")
+            print_info("JupyterLab is ready on port 8888.")
             return actual
         time.sleep(1)
         waited += 1
