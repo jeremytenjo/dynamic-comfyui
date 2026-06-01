@@ -7,9 +7,29 @@ from pathlib import Path
 from unittest.mock import patch
 
 from dynamic_comfyui_runtime.runtime.service import start_comfyui_service
+from dynamic_comfyui_runtime.runtime.service import stop_comfyui_service
 
 
 class ServiceStartTimeoutTests(unittest.TestCase):
+    def test_stop_comfyui_service_uses_timeout_for_comfy_stop(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            comfyui_dir = Path(td) / "ComfyUI"
+            comfyui_dir.mkdir(parents=True, exist_ok=True)
+
+            with (
+                patch("dynamic_comfyui_runtime.runtime.service.command_exists", return_value=True),
+                patch("dynamic_comfyui_runtime.runtime.service.is_main_py_listen_process_running", return_value=False),
+                patch("dynamic_comfyui_runtime.runtime.service.run") as run_cmd,
+            ):
+                stop_comfyui_service(comfyui_dir)
+
+            comfy_stop_call = run_cmd.call_args_list[0]
+            self.assertEqual(comfy_stop_call.args[0], ["comfy", "--workspace", str(comfyui_dir), "stop"])
+            self.assertEqual(comfy_stop_call.kwargs.get("timeout"), 15)
+            self.assertEqual(comfy_stop_call.kwargs.get("input_text"), "\n")
+            self.assertEqual(comfy_stop_call.kwargs.get("check"), False)
+            self.assertEqual(comfy_stop_call.kwargs.get("quiet"), True)
+
     def test_start_comfyui_service_uses_timeout_for_comfy_launch(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
