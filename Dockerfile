@@ -2,7 +2,7 @@ FROM runpod/pytorch:1.0.2-cu1281-torch280-ubuntu2404
 
 ENV PYTHONUNBUFFERED=1
 WORKDIR /
-ARG COMFYUI_VERSION=v0.22.0
+ARG COMFYUI_VERSION=v0.23.0
 ARG COMFYUI_UPDATE_TOKEN=stable
 ARG COMFYUI_UPGRADE=false
 
@@ -24,14 +24,14 @@ RUN set -eux; \
     COMFYUI_INSTALL_VERSION="${COMFYUI_VERSION}"; \
     COMFYUI_INSTALL_VERSION="$(printf '%s' "${COMFYUI_INSTALL_VERSION}" | tr -d '[:space:]')"; \
     if [ -z "${COMFYUI_INSTALL_VERSION}" ]; then \
-        COMFYUI_INSTALL_VERSION="v0.22.0"; \
+        COMFYUI_INSTALL_VERSION="v0.23.0"; \
     elif printf '%s' "${COMFYUI_INSTALL_VERSION}" | grep -Eq '^v?[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z]+)*$'; then \
         true; \
     elif [ "${COMFYUI_INSTALL_VERSION}" = "latest" ] || [ "${COMFYUI_INSTALL_VERSION}" = "stable" ] || [ "${COMFYUI_INSTALL_VERSION}" = "nightly" ]; then \
-        echo "⚠️ COMFYUI_VERSION='${COMFYUI_INSTALL_VERSION}' is legacy; using pinned default v0.22.0."; \
-        COMFYUI_INSTALL_VERSION="v0.22.0"; \
+        echo "⚠️ COMFYUI_VERSION='${COMFYUI_INSTALL_VERSION}' is legacy; using pinned default v0.23.0."; \
+        COMFYUI_INSTALL_VERSION="v0.23.0"; \
     else \
-        echo "❌ COMFYUI_VERSION must be semver (example: 0.22.0 or v0.22.0). Got: '${COMFYUI_INSTALL_VERSION}'."; \
+        echo "❌ COMFYUI_VERSION must be semver (example: 0.23.0 or v0.23.0). Got: '${COMFYUI_INSTALL_VERSION}'."; \
         exit 1; \
     fi; \
     if [ -d "/ComfyUI/.git" ] && [ "${COMFYUI_UPGRADE}" != "true" ]; then \
