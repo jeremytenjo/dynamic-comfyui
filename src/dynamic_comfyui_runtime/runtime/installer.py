@@ -200,6 +200,13 @@ def install_files(
 
         print_info(f"Remaining downloads ({len(pending_snapshot)}):")
         for target, (downloaded, total) in pending_snapshot:
+            started = target in start_time_by_target
+            if started and downloaded <= 0:
+                if total and total > 0:
+                    print_info(f" - {target}: in progress ({format_size_for_display(total)} total)")
+                else:
+                    print_info(f" - {target}: in progress (size unknown)")
+                continue
             if total and total > 0:
                 print_info(
                     f" - {target}: {format_size_for_display(downloaded)}/{format_size_for_display(total)}"
@@ -311,7 +318,13 @@ def install_files(
                         )
                         last_log_time_by_target[file_spec.target] = now
 
-            download_file(file_spec.url, target_path, hf_token=hf_token, on_progress=_on_download_progress)
+            download_file(
+                file_spec.url,
+                target_path,
+                hf_token=hf_token,
+                on_progress=_on_download_progress,
+                backend="urllib",
+            )
             if not target_path.is_file():
                 raise RuntimeError("Download completed but target file is missing on disk")
             if known_size is not None and known_size > 0:

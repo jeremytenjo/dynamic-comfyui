@@ -17,8 +17,10 @@ class InstallerDownloadCompletionTests(unittest.TestCase):
             comfyui_dir.mkdir(parents=True, exist_ok=True)
             spec = FileSpec(url="https://example.com/file.bin", target="models/file.bin")
 
-            def fake_download(url: str, target: Path, *, hf_token: str | None = None, on_progress=None) -> None:
-                _ = (url, hf_token)
+            def fake_download(
+                url: str, target: Path, *, hf_token: str | None = None, on_progress=None, backend: str | None = None
+            ) -> None:
+                _ = (url, hf_token, backend)
                 target.parent.mkdir(parents=True, exist_ok=True)
                 if on_progress is not None:
                     on_progress(10, 100)
@@ -39,8 +41,10 @@ class InstallerDownloadCompletionTests(unittest.TestCase):
             comfyui_dir.mkdir(parents=True, exist_ok=True)
             spec = FileSpec(url="https://example.com/file.bin", target="models/file.bin")
 
-            def fake_download(url: str, target: Path, *, hf_token: str | None = None, on_progress=None) -> None:
-                _ = (url, hf_token)
+            def fake_download(
+                url: str, target: Path, *, hf_token: str | None = None, on_progress=None, backend: str | None = None
+            ) -> None:
+                _ = (url, hf_token, backend)
                 target.parent.mkdir(parents=True, exist_ok=True)
                 if on_progress is not None:
                     on_progress(10, 100)
@@ -71,8 +75,10 @@ class InstallerDownloadCompletionTests(unittest.TestCase):
                 _ = hf_token
                 return 100 if url.endswith("one.bin") else 200
 
-            def fake_download(url: str, target: Path, *, hf_token: str | None = None, on_progress=None) -> None:
-                _ = (url, hf_token)
+            def fake_download(
+                url: str, target: Path, *, hf_token: str | None = None, on_progress=None, backend: str | None = None
+            ) -> None:
+                _ = (url, hf_token, backend)
                 target.parent.mkdir(parents=True, exist_ok=True)
                 size = fake_probe(url)
                 if target.name == "two.bin":
@@ -98,6 +104,44 @@ class InstallerDownloadCompletionTests(unittest.TestCase):
                     for message in info_messages
                 )
             )
+
+    def test_remaining_download_snapshot_reports_in_progress_before_first_bytes(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            comfyui_dir = Path(td) / "ComfyUI"
+            comfyui_dir.mkdir(parents=True, exist_ok=True)
+            specs = [
+                FileSpec(url="https://example.com/one.bin", target="models/one.bin"),
+                FileSpec(url="https://example.com/two.bin", target="models/two.bin"),
+            ]
+            info_messages: list[str] = []
+
+            def fake_probe(url: str, *, hf_token: str | None = None) -> int:
+                _ = hf_token
+                return 100 if url.endswith("one.bin") else 200
+
+            def fake_download(
+                url: str, target: Path, *, hf_token: str | None = None, on_progress=None, backend: str | None = None
+            ) -> None:
+                _ = (hf_token, backend)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                if url.endswith("two.bin"):
+                    time.sleep(0.05)
+                size = fake_probe(url)
+                if on_progress is not None and url.endswith("one.bin"):
+                    on_progress(size, size)
+                target.write_bytes(b"x" * size)
+
+            with (
+                patch("dynamic_comfyui_runtime.runtime.installer.probe_remote_file_size", side_effect=fake_probe),
+                patch("dynamic_comfyui_runtime.runtime.installer.effective_free_bytes", return_value=10_000_000),
+                patch("dynamic_comfyui_runtime.runtime.installer.download_file", side_effect=fake_download),
+                patch("dynamic_comfyui_runtime.runtime.installer.print_info", side_effect=info_messages.append),
+            ):
+                failures = install_files(specs, comfyui_dir, hf_token=None)
+
+            self.assertEqual(failures, [])
+            self.assertTrue(any("models/two.bin: in progress (200 B total)" in message for message in info_messages))
+            self.assertFalse(any("models/two.bin: 0 B/200 B" in message for message in info_messages))
 
 
 if __name__ == "__main__":
