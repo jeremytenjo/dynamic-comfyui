@@ -145,6 +145,8 @@ Run this command in the terminal to uninstall the dynamic-comfyui runtime packag
 
 Run this command in the terminal to print runtime/GPU versions and memory info `dynamic-comfyui system-info`
 
+Run this command in the terminal to download a direct file URL into the current directory `dynamic-comfyui download <file-url>`
+
 Run this command in the terminal to list session project manifest URLs `dynamic-comfyui deps-ls`
 
 Run this command in the terminal to list available commands `dynamic-comfyui help`
