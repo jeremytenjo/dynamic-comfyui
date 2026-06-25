@@ -33,6 +33,13 @@ class CliParserTests(unittest.TestCase):
         args = parser.parse_args(["deps-ls"])
         self.assertEqual(args.command, "deps-ls")
 
+    def test_download_with_url(self) -> None:
+        parser = build_parser()
+        url = "https://huggingface.co/example/repo/resolve/main/model.safetensors?download=true"
+        args = parser.parse_args(["download", url])
+        self.assertEqual(args.command, "download")
+        self.assertEqual(args.url, url)
+
     def test_project_ls_alias(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["project-ls"])

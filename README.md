@@ -66,6 +66,10 @@ Define project manifests (custom nodes + files) for repeatable ComfyUI setup on 
 - `dc system-info`
   Print ComfyUI/frontend/Python/PyTorch/CUDA/GPU/RAM version information.
 
+- `dc download`
+  Download a direct file URL into the current directory with progress.
+  Usage: `dc download <file-url>`.
+
 - `dc deps-ls`
   List all session project manifest URLs used so far.
   Aliases: `dc project-ls`, `dc projects-ls`.
@@ -188,9 +192,10 @@ Optional hooks:
 
 ### Hugging Face Token Handling
 
-If pending Hugging Face model downloads return `401 Unauthorized`, the installer prompts for a token once and reuses it for all required downloads in that run.
+If pending Hugging Face model downloads return `401 Unauthorized`, the installer prompts for a token once and reuses it for all required downloads in that run. `dc download` uses the same token handling for direct Hugging Face file URLs.
 
 - The token is used only for that run and is not saved.
+- Existing `HF_TOKEN`, `HUGGING_FACE_HUB_TOKEN`, or `HUGGINGFACE_TOKEN` environment variables are reused when present.
 - Create a token at: https://huggingface.co/settings/tokens
 
 ## Default Resources (All Projects)

@@ -2,9 +2,6 @@ from __future__ import annotations
 
 import os
 import tempfile
-import urllib.parse
-import urllib.error
-import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -30,6 +27,7 @@ from .hooks import (
     confirm_and_run_on_install_complete_commands,
     validate_no_overriding_hook_conflicts,
 )
+from .huggingface import hf_url_requires_token, is_huggingface_url, read_hf_token_from_env
 from .manifests import (
     FileSpec,
     MergedManifest,
@@ -263,8 +261,7 @@ def _retry_hf_401_file_downloads(
         spec = spec_by_target.get(Path(target).as_posix())
         if spec is None:
             return False
-        host = urllib.parse.urlparse(spec.url).netloc.lower()
-        if "huggingface.co" not in host:
+        if not is_huggingface_url(spec.url):
             return False
         return "(401)" in error or " 401" in error or "401 " in error
 
@@ -326,35 +323,6 @@ def _pending_files_for_download(merged: MergedManifest, comfyui_dir: Path) -> li
     return pending
 
 
-def _hf_url_requires_token(url: str) -> bool:
-    headers = {
-        "Accept": "*/*",
-        "User-Agent": "dynamic-comfyui-runtime-downloader/1.0",
-    }
-    try:
-        head_req = urllib.request.Request(url, headers=headers, method="HEAD")
-        with urllib.request.urlopen(head_req, timeout=20):  # noqa: S310
-            return False
-    except urllib.error.HTTPError as exc:
-        if exc.code == 401:
-            return True
-    except Exception:
-        pass
-
-    try:
-        range_headers = dict(headers)
-        range_headers["Range"] = "bytes=0-0"
-        get_req = urllib.request.Request(url, headers=range_headers, method="GET")
-        with urllib.request.urlopen(get_req, timeout=20):  # noqa: S310
-            return False
-    except urllib.error.HTTPError as exc:
-        if exc.code == 401:
-            return True
-    except Exception:
-        pass
-    return False
-
-
 def _ensure_hf_token_for_pending_downloads(
     merged: MergedManifest,
     comfyui_dir: Path,
@@ -362,17 +330,19 @@ def _ensure_hf_token_for_pending_downloads(
 ) -> str | None:
     if hf_token:
         return hf_token
+    hf_token = read_hf_token_from_env()
+    if hf_token:
+        return hf_token
 
     pending_files = _pending_files_for_download(merged, comfyui_dir)
     hf_urls = []
     for spec in pending_files:
-        host = urllib.parse.urlparse(spec.url).netloc.lower()
-        if "huggingface.co" in host:
+        if is_huggingface_url(spec.url):
             hf_urls.append(spec.url)
     if not hf_urls:
         return None
 
-    requires_token = any(_hf_url_requires_token(url) for url in hf_urls)
+    requires_token = any(hf_url_requires_token(url) for url in hf_urls)
     if not requires_token:
         return None
 
@@ -396,13 +366,15 @@ def _ensure_hf_token_for_manifest_batch(
 ) -> str | None:
     if hf_token:
         return hf_token
+    hf_token = read_hf_token_from_env()
+    if hf_token:
+        return hf_token
 
     hf_urls: list[str] = []
     seen_urls: set[str] = set()
     for merged in merged_manifests:
         for spec in _pending_files_for_download(merged, comfyui_dir):
-            host = urllib.parse.urlparse(spec.url).netloc.lower()
-            if "huggingface.co" not in host:
+            if not is_huggingface_url(spec.url):
                 continue
             if spec.url in seen_urls:
                 continue
@@ -411,7 +383,7 @@ def _ensure_hf_token_for_manifest_batch(
     if not hf_urls:
         return None
 
-    requires_token = any(_hf_url_requires_token(url) for url in hf_urls)
+    requires_token = any(hf_url_requires_token(url) for url in hf_urls)
     if not requires_token:
         return None
 

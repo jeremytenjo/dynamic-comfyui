@@ -6,6 +6,7 @@ import re
 from pathlib import Path
 
 from .runtime.ui import print_error, print_info, setup_rich_runtime
+from .runtime.download import download_url_to_current_directory
 from .runtime.operations import (
     RuntimeContext,
     cmd_add_project,
@@ -42,6 +43,7 @@ COMMANDS: tuple[str, ...] = (
     "update-dc",
     "uninstall-dc",
     "system-info",
+    "download",
     "deps-ls",
     "project-ls",
     "projects-ls",
@@ -156,6 +158,10 @@ def _help_text() -> str:
 - dc system-info
   Print ComfyUI/frontend/Python/PyTorch/CUDA/GPU/RAM version information.
 
+- dc download
+  Download a direct file URL into the current directory with progress.
+  Usage: dc download <file_url>
+
 - dc help
   Show this help menu.
 
@@ -172,7 +178,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     for cmd in COMMANDS:
-        if cmd in ("start", "install-deps", "remove-deps", "set-default-manifest-url"):
+        if cmd in ("start", "install-deps", "remove-deps", "set-default-manifest-url", "download"):
             continue
         subparsers.add_parser(cmd)
 
@@ -187,6 +193,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     set_default_manifest_url_parser = subparsers.add_parser("set-default-manifest-url")
     set_default_manifest_url_parser.add_argument("manifest_url", nargs="?", default=None)
+
+    download_parser = subparsers.add_parser("download")
+    download_parser.add_argument("url")
     return parser
 
 
@@ -236,6 +245,8 @@ def main() -> None:
             cmd_set_default_manifest_url(ctx, args.manifest_url)
         elif args.command == "start":
             cmd_start(ctx, args.project_url)
+        elif args.command == "download":
+            download_url_to_current_directory(args.url)
         else:
             handlers[args.command](ctx)
     except Exception as exc:
