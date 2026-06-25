@@ -27,6 +27,17 @@ class FileInstallFailure:
     error: str
 
 
+def _format_duration(seconds: float) -> str:
+    seconds = max(0, int(round(seconds)))
+    if seconds < 60:
+        return f"{seconds}s"
+    minutes, seconds = divmod(seconds, 60)
+    if minutes < 60:
+        return f"{minutes}m {seconds}s"
+    hours, minutes = divmod(minutes, 60)
+    return f"{hours}h {minutes}m {seconds}s"
+
+
 def install_custom_nodes(
     custom_nodes: list[CustomNode], custom_nodes_dir: Path, *, on_progress: callable | None = None
 ) -> list[NodeInstallFailure]:
@@ -174,6 +185,7 @@ def install_files(
     log_interval_seconds = 20.0
     checkpoint_state: dict[str, int] = {}
     last_log_time_by_target: dict[str, float] = {}
+    start_time_by_target: dict[str, float] = {}
     highlighted_remaining_target: str | None = None
 
     def _print_remaining_downloads(pending_targets: set[str]) -> None:
@@ -195,6 +207,28 @@ def install_files(
             else:
                 print_info(f" - {target}: {format_size_for_display(downloaded)} downloaded")
 
+    def _print_next_download_estimate(pending_targets: set[str], bytes_per_second: float) -> None:
+        if not pending_targets or bytes_per_second <= 0:
+            return
+
+        next_target = sorted(pending_targets)[0]
+        with progress_lock:
+            downloaded, total = progress_snapshots.get(next_target, (0, None))
+        if not total or total <= 0:
+            print_info(f"Estimated next download duration for {next_target}: unavailable (size unknown)")
+            return
+
+        remaining_bytes = max(total - downloaded, 0)
+        estimate_label = _format_duration(remaining_bytes / bytes_per_second)
+        rate_label = f"{format_size_for_display(int(bytes_per_second))}/s"
+        if downloaded > 0:
+            print_info(
+                f"Estimated next download duration for {next_target}: "
+                f"~{estimate_label} remaining at {rate_label}"
+            )
+        else:
+            print_info(f"Estimated next download duration for {next_target}: ~{estimate_label} at {rate_label}")
+
     def _process_file(file_spec: FileSpec) -> FileInstallFailure | None:
         nonlocal reserved_known_bytes
         target_path = comfyui_dir / file_spec.target
@@ -203,6 +237,8 @@ def install_files(
         known_size = known_sizes_by_target.get(file_spec.target)
         reserved_size = 0
         try:
+            start_time = time.monotonic()
+            start_time_by_target[file_spec.target] = start_time
             if known_size is not None and known_size > 0:
                 print_info(
                     f"[download] {file_spec.target}: started (0% 0/{format_size_for_display(known_size)})"
@@ -320,6 +356,10 @@ def install_files(
                 print_info(f"Download progress: {remaining_label}")
             else:
                 completed, total = progress_snapshots.get(file_spec.target, (0, None))
+                start_time = start_time_by_target.get(file_spec.target)
+                elapsed_seconds = time.monotonic() - start_time if start_time is not None else 0.0
+                duration_label = _format_duration(elapsed_seconds)
+                download_rate = completed / elapsed_seconds if completed > 0 and elapsed_seconds > 0 else None
                 if total and total > 0:
                     percent = int((completed * 100) / total) if total > 0 else 0
                     if completed < total:
@@ -329,14 +369,17 @@ def install_files(
                         )
                     print_success(
                         f"[download] {file_spec.target}: {percent}% "
-                        f"({format_size_for_display(completed)}/{format_size_for_display(total)}) completed {remaining_label}"
+                        f"({format_size_for_display(completed)}/{format_size_for_display(total)}) completed "
+                        f"in {duration_label} {remaining_label}"
                     )
                 else:
                     print_success(
                         f"[download] {file_spec.target}: completed "
-                        f"({format_size_for_display(completed)}) {remaining_label}"
+                        f"({format_size_for_display(completed)}) in {duration_label} {remaining_label}"
                     )
             if remaining_downloads > 0:
+                if failure is None and download_rate and download_rate > 0:
+                    _print_next_download_estimate(pending_targets, download_rate)
                 _print_remaining_downloads(pending_targets)
 
             if remaining_downloads == 1 and len(pending_targets) == 1:
