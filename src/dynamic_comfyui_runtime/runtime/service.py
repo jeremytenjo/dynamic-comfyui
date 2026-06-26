@@ -19,7 +19,7 @@ from .common import (
 )
 from .jupyter_permissions import ensure_jupyter_delete_permissions
 from .progress import stop_setup_page_server
-from .ui import print_info
+from .ui import print_info, print_warning
 
 
 def _looks_like_comfyui_workspace(path: Path) -> bool:
@@ -72,6 +72,10 @@ def discover_comfyui_workspace(network_volume: Path) -> Path | None:
     return None
 
 
+def _image_comfyui_workspace_path() -> Path:
+    return Path("/ComfyUI")
+
+
 def set_network_volume_default(network_volume: Path) -> Path:
     if network_volume.is_dir():
         return network_volume
@@ -84,9 +88,25 @@ def ensure_comfyui_workspace(network_volume: Path) -> tuple[Path, Path]:
     custom_nodes_dir = comfyui_dir / "custom_nodes"
     ensure_dir(network_volume)
 
-    root_comfy = Path("/ComfyUI")
-    if not comfyui_dir.is_dir() and root_comfy.is_dir() and not root_comfy.is_symlink():
-        print(f"Moving image ComfyUI workspace to persistent volume: {comfyui_dir}")
+    root_comfy = _image_comfyui_workspace_path()
+    root_is_image_workspace = (
+        root_comfy != comfyui_dir
+        and root_comfy.is_dir()
+        and not root_comfy.is_symlink()
+        and _looks_like_comfyui_workspace(root_comfy)
+    )
+    target_is_valid = _looks_like_comfyui_workspace(comfyui_dir)
+    if root_is_image_workspace and not target_is_valid:
+        if comfyui_dir.exists():
+            backup_base = comfyui_dir.with_name(f"{comfyui_dir.name}.invalid-{int(time.time())}")
+            backup_dir = backup_base
+            suffix = 1
+            while backup_dir.exists():
+                backup_dir = backup_base.with_name(f"{backup_base.name}-{suffix}")
+                suffix += 1
+            print_warning(f"Backing up invalid ComfyUI workspace at {comfyui_dir} to {backup_dir}")
+            comfyui_dir.rename(backup_dir)
+        print_info(f"Moving image ComfyUI workspace to persistent volume: {comfyui_dir}")
         shutil.move(str(root_comfy), str(comfyui_dir))
 
     if comfyui_dir.is_dir():
@@ -126,7 +146,7 @@ def _install_comfy_cli(network_volume: Path) -> None:
 
 def ensure_comfy_cli_ready(network_volume: Path) -> None:
     if not command_exists("comfy"):
-        print("Installing comfy-cli...")
+        print_info("Installing comfy-cli...")
         _install_comfy_cli(network_volume)
     if not command_exists("comfy"):
         raise RuntimeError("comfy-cli installation completed but 'comfy' command is not available")
@@ -134,7 +154,7 @@ def ensure_comfy_cli_ready(network_volume: Path) -> None:
     try:
         run(["comfy", "tracking", "disable"], check=False, quiet=True, timeout=20, input_text="n\n")
     except Exception as exc:
-        print(f"Warning: comfy tracking disable skipped: {exc}")
+        print_warning(f"comfy tracking disable skipped: {exc}")
 
 
 def verify_comfyui_core_workspace(comfyui_dir: Path) -> None:
@@ -152,7 +172,7 @@ def verify_comfyui_core_workspace(comfyui_dir: Path) -> None:
 
 def enable_manager_gui(comfyui_dir: Path, *, quiet: bool = False) -> None:
     if not quiet:
-        print("Enabling ComfyUI-Manager modern UI...")
+        print_info("Enabling ComfyUI-Manager modern UI...")
     run(
         ["comfy", "--workspace", str(comfyui_dir), "manager", "enable-gui"],
         timeout=30,
@@ -274,7 +294,7 @@ def _wait_for_comfyui_ready(metric_start: int, *, log_path: Path | None = None) 
             tail = _read_log_tail(log_path)
             if "runtimeerror:" in tail.lower():
                 raise RuntimeError(f"ComfyUI runtime error during startup:\n{tail}")
-        print("ComfyUI starting...")
+        print_info("ComfyUI starting...")
         time.sleep(2)
         waited += 2
     details = "ComfyUI failed to become ready within 90s"
@@ -291,9 +311,9 @@ def start_comfyui_service(comfyui_dir: Path, network_volume: Path, install_start
     health_url = "http://127.0.0.1:8188/system_stats"
 
     if is_http_reachable(health_url):
-        print("ComfyUI is already running; restarting to load newly installed files and custom nodes.")
+        print_info("ComfyUI is already running; restarting to load newly installed files and custom nodes.")
     else:
-        print("Ensuring no stale ComfyUI background service is running before launch.")
+        print_info("Ensuring no stale ComfyUI background service is running before launch.")
 
     stop_comfyui_service(comfyui_dir)
     stop_setup_page_server()
@@ -301,7 +321,7 @@ def start_comfyui_service(comfyui_dir: Path, network_volume: Path, install_start
     sanitize_torch_cuda_alloc_conf()
     _ensure_manager_runtime_ready(comfyui_dir, network_volume)
 
-    print("Starting ComfyUI via comfy-cli")
+    print_info("Starting ComfyUI via comfy-cli")
     launch = run(
         [
             "comfy",
@@ -336,7 +356,9 @@ def start_comfyui_service(comfyui_dir: Path, network_volume: Path, install_start
         )
         main_py = comfyui_dir / "main.py"
         if main_py.is_file():
-            print(f"comfy-cli launch failed ({exc}). Falling back to `python main.py --listen 0.0.0.0 --port 8188`.")
+            print_warning(
+                f"comfy-cli launch failed ({exc}). Falling back to `python main.py --listen 0.0.0.0 --port 8188`."
+            )
             return start_comfyui_service_via_main_py(comfyui_dir, install_start_ts=install_start_ts)
         raise exc
 
@@ -353,9 +375,9 @@ def start_comfyui_service_via_main_py(comfyui_dir: Path, install_start_ts: int |
     health_url = "http://127.0.0.1:8188/system_stats"
 
     if is_http_reachable(health_url):
-        print("ComfyUI is already running; restarting to load newly installed files and custom nodes.")
+        print_info("ComfyUI is already running; restarting to load newly installed files and custom nodes.")
     else:
-        print("Ensuring no stale ComfyUI background service is running before launch.")
+        print_info("Ensuring no stale ComfyUI background service is running before launch.")
 
     stop_comfyui_service(comfyui_dir)
     stop_setup_page_server()
@@ -367,7 +389,7 @@ def start_comfyui_service_via_main_py(comfyui_dir: Path, install_start_ts: int |
     if not (comfyui_dir / "main.py").is_file():
         raise RuntimeError(f"ComfyUI main.py not found in workspace: {comfyui_dir / 'main.py'}")
 
-    print(f"Starting ComfyUI via main.py (cwd: {comfyui_dir})")
+    print_info(f"Starting ComfyUI via main.py (cwd: {comfyui_dir})")
     python_cmd = "python" if command_exists("python") else "python3"
     log_path = Path("/tmp/dynamic-comfyui-main.log")
     log_path.unlink(missing_ok=True)
@@ -401,9 +423,9 @@ def start_comfyui_service_foreground(
     _ = install_start_ts
     health_url = "http://127.0.0.1:8188/system_stats"
     if is_http_reachable(health_url):
-        print("ComfyUI is already running; restarting in foreground.")
+        print_info("ComfyUI is already running; restarting in foreground.")
     else:
-        print("Ensuring no stale ComfyUI background service is running before launch.")
+        print_info("Ensuring no stale ComfyUI background service is running before launch.")
 
     stop_comfyui_service(comfyui_dir)
     stop_setup_page_server()
@@ -419,9 +441,9 @@ def start_comfyui_service_foreground(
 
     runpod_url = resolve_runpod_proxy_url(8188)
     gui_url = runpod_url if runpod_url else "http://127.0.0.1:8188"
-    print(f"Starting ComfyUI in foreground via main.py (cwd: {comfyui_dir})")
+    print_info(f"Starting ComfyUI in foreground via main.py (cwd: {comfyui_dir})")
     print_info(f"ComfyUI URL: [url]{gui_url}[/]")
-    print("Press Ctrl+C to stop ComfyUI.")
+    print_info("Press Ctrl+C to stop ComfyUI.")
 
     python_cmd = "python" if command_exists("python") else "python3"
     proc = subprocess.Popen(  # noqa: S603

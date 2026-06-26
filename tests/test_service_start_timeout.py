@@ -8,9 +8,37 @@ from unittest.mock import patch
 
 from dynamic_comfyui_runtime.runtime.service import start_comfyui_service
 from dynamic_comfyui_runtime.runtime.service import stop_comfyui_service
+from dynamic_comfyui_runtime.runtime.service import ensure_comfyui_workspace
 
 
 class ServiceStartTimeoutTests(unittest.TestCase):
+    def test_ensure_comfyui_workspace_replaces_invalid_target_from_image_workspace(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            network_volume = root / "workspace"
+            invalid_target = network_volume / "ComfyUI"
+            invalid_target.mkdir(parents=True, exist_ok=True)
+            (invalid_target / "partial.txt").write_text("not a core workspace\n", encoding="utf-8")
+
+            image_workspace = root / "image" / "ComfyUI"
+            (image_workspace / ".git").mkdir(parents=True, exist_ok=True)
+            (image_workspace / "custom_nodes").mkdir(parents=True, exist_ok=True)
+            (image_workspace / "models").mkdir(parents=True, exist_ok=True)
+            (image_workspace / "main.py").write_text("print('ok')\n", encoding="utf-8")
+
+            with patch(
+                "dynamic_comfyui_runtime.runtime.service._image_comfyui_workspace_path",
+                return_value=image_workspace,
+            ):
+                comfyui_dir, custom_nodes_dir = ensure_comfyui_workspace(network_volume)
+
+            self.assertEqual(comfyui_dir, network_volume / "ComfyUI")
+            self.assertEqual(custom_nodes_dir, comfyui_dir / "custom_nodes")
+            self.assertTrue((comfyui_dir / "main.py").is_file())
+            backups = list(network_volume.glob("ComfyUI.invalid-*"))
+            self.assertEqual(len(backups), 1)
+            self.assertTrue((backups[0] / "partial.txt").is_file())
+
     def test_stop_comfyui_service_uses_timeout_for_comfy_stop(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             comfyui_dir = Path(td) / "ComfyUI"

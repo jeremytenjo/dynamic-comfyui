@@ -93,6 +93,37 @@ class StartHooksTests(unittest.TestCase):
             confirm_and_run_hooks.assert_called_once_with(["echo provided"], cwd=root)
             run_comfyui_foreground.assert_called_once()
 
+    def test_start_with_project_url_uses_detected_comfyui_workspace_root(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            configured_root = Path(td) / "configured"
+            detected_root = Path(td) / "detected"
+            configured_root.mkdir(parents=True, exist_ok=True)
+            detected_root.mkdir(parents=True, exist_ok=True)
+            detected_workspace = detected_root / "ComfyUI"
+            ctx = self._ctx(configured_root)
+            manifest = detected_root / "project.json"
+            manifest.write_text('{"custom_nodes":[],"files":[]}\n', encoding="utf-8")
+
+            with (
+                patch("dynamic_comfyui_runtime.runtime.operations.configure_process_env"),
+                patch(
+                    "dynamic_comfyui_runtime.runtime.operations.discover_comfyui_workspace",
+                    return_value=detected_workspace,
+                ),
+                patch(
+                    "dynamic_comfyui_runtime.runtime.operations.prepare_project_manifest",
+                    return_value=(manifest, "https://example.com/project.json"),
+                ) as prepare_manifest,
+                patch("dynamic_comfyui_runtime.runtime.operations._save_selected_project") as save_project,
+                patch("dynamic_comfyui_runtime.runtime.operations.run_comfyui_install_flow_foreground") as install_flow,
+            ):
+                cmd_start(ctx, "https://example.com/project.json")
+
+            prepare_manifest.assert_called_once_with(detected_root, "https://example.com/project.json")
+            save_project.assert_called_once_with(detected_root, manifest, "https://example.com/project.json")
+            install_flow.assert_called_once_with(ctx, manifest)
+            self.assertEqual(ctx.network_volume, detected_root)
+
     def test_start_uses_foreground_comfyui_install_flow_when_manifest_has_no_hook_commands(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)

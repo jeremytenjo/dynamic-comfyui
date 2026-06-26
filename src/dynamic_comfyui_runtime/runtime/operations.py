@@ -714,6 +714,15 @@ def _save_selected_project(network_volume: Path, manifest_path: Path, source_url
 def cmd_start(ctx: RuntimeContext, project_url: str | None = None) -> None:
     configure_process_env()
     network_volume = set_network_volume_default(ctx.network_volume)
+    detected_comfyui = discover_comfyui_workspace(network_volume)
+    if detected_comfyui is not None:
+        detected_volume = detected_comfyui.parent
+        if detected_volume != network_volume:
+            print_info(f"Detected ComfyUI workspace at {detected_comfyui}. Using {detected_volume} as workspace root.")
+        network_volume = detected_volume
+        ctx.network_volume = network_volume
+    else:
+        print_warning(f"Could not auto-detect ComfyUI workspace. Using configured workspace root: {network_volume}")
     if project_url is None:
         comfyui_dir, _ = ensure_comfyui_workspace(network_volume)
         start_comfyui_service_foreground(comfyui_dir, network_volume)
@@ -1099,8 +1108,8 @@ def cmd_deps_ls(_ctx: RuntimeContext) -> None:
 
     print_rule("Session Project URLs")
     for project_url in saved_history_urls:
-        print(f"project_url\t{project_url}")
+        print_info(f"project_url\t{project_url}")
     if default_manifest_url:
-        print(f"default_manifest_url\t{default_manifest_url}")
+        print_info(f"default_manifest_url\t{default_manifest_url}")
     if not saved_history_urls and not default_manifest_url:
-        print("(none)")
+        print_info("(none)")
