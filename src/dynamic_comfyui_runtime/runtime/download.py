@@ -77,33 +77,73 @@ def _download_once(url: str, target: Path, *, hf_token: str | None) -> None:
     last_log_time = 0.0
     last_checkpoint = 0
 
+    def _format_rate(downloaded: int, now: float) -> str:
+        elapsed = max(now - start_time, 0.001)
+        return f"{format_size_for_display(int(downloaded / elapsed))}/s"
+
+    def _format_percent(downloaded: int, total: int) -> str:
+        percent = int((downloaded * 100) / total)
+        if downloaded > 0 and percent <= 0:
+            return "<1%"
+        return f"{percent}%"
+
     def _on_progress(downloaded: int, reported_total: int | None) -> None:
         nonlocal last_log_time, last_checkpoint
         now = time.monotonic()
         total = total_size if total_size and total_size > 0 else reported_total
         if not total or total <= 0:
             if downloaded > 0 and now - last_log_time >= 5.0:
-                print_info(f"[download] {target.name}: {format_size_for_display(downloaded)} downloaded")
+                print_info(
+                    f"[download] {target.name}: {format_size_for_display(downloaded)} downloaded "
+                    f"at {_format_rate(downloaded, now)}"
+                )
                 last_log_time = now
             return
 
         percent = int((downloaded * 100) / total)
-        next_checkpoint = min((percent // 5) * 5, 95)
+        if downloaded > 0 and percent <= 0 and last_checkpoint <= 0 and last_log_time <= 0:
+            print_info(
+                f"[download] {target.name}: <1% "
+                f"({format_size_for_display(downloaded)}/{format_size_for_display(total)}) "
+                f"at {_format_rate(downloaded, now)}"
+            )
+            last_log_time = now
+            return
+
+        if downloaded >= total:
+            if last_checkpoint < 100:
+                print_info(
+                    f"[download] {target.name}: 100% "
+                    f"({format_size_for_display(downloaded)}/{format_size_for_display(total)}) "
+                    f"at {_format_rate(downloaded, now)}"
+                )
+                last_checkpoint = 100
+                last_log_time = now
+            return
+
+        next_checkpoint = min(percent, 95)
         if next_checkpoint > last_checkpoint:
             print_info(
-                f"[download] {target.name}: {next_checkpoint}% "
-                f"({format_size_for_display(downloaded)}/{format_size_for_display(total)})"
+                f"[download] {target.name}: {_format_percent(downloaded, total)} "
+                f"({format_size_for_display(downloaded)}/{format_size_for_display(total)}) "
+                f"at {_format_rate(downloaded, now)}"
             )
             last_checkpoint = next_checkpoint
             last_log_time = now
-        if downloaded > 0 and now - last_log_time >= 20.0:
+        if downloaded > 0 and now - last_log_time >= 5.0:
             print_info(
-                f"[download] {target.name}: {percent}% "
-                f"({format_size_for_display(downloaded)}/{format_size_for_display(total)})"
+                f"[download] {target.name}: {_format_percent(downloaded, total)} "
+                f"({format_size_for_display(downloaded)}/{format_size_for_display(total)}) "
+                f"at {_format_rate(downloaded, now)}"
             )
             last_log_time = now
 
     download_file(url, target, hf_token=hf_token, on_progress=_on_progress, backend="urllib")
     elapsed = time.monotonic() - start_time
     downloaded = target.stat().st_size if target.is_file() else 0
+    if total_size and total_size > 0 and downloaded >= total_size and last_checkpoint < 100:
+        print_info(
+            f"[download] {target.name}: 100% "
+            f"({format_size_for_display(downloaded)}/{format_size_for_display(total_size)})"
+        )
     print_success(f"Downloaded {target} ({format_size_for_display(downloaded)}) in {_format_duration(elapsed)}.")

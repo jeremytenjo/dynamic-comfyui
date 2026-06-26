@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from dynamic_comfyui_runtime.runtime.download import download_url_to_current_directory, filename_from_url
+from dynamic_comfyui_runtime.runtime.download import _download_once, download_url_to_current_directory, filename_from_url
 
 
 class DownloadCommandTests(unittest.TestCase):
@@ -75,6 +75,48 @@ class DownloadCommandTests(unittest.TestCase):
 
         self.assertEqual(target.name, "model.safetensors")
         self.assertEqual(tokens, [None, "prompt-token"])
+
+    def test_direct_download_progress_does_not_report_zero_percent_after_bytes_start(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "model.bin"
+            info_messages: list[str] = []
+
+            def fake_download_file(url: str, target: Path, *, hf_token=None, on_progress=None, backend=None) -> None:
+                _ = (url, hf_token, backend)
+                if on_progress:
+                    on_progress(1, 1_000)
+                target.write_bytes(b"x")
+
+            with (
+                patch("dynamic_comfyui_runtime.runtime.download.probe_remote_file_size", return_value=1_000),
+                patch("dynamic_comfyui_runtime.runtime.download.download_file", side_effect=fake_download_file),
+                patch("dynamic_comfyui_runtime.runtime.download.print_info", side_effect=info_messages.append),
+            ):
+                _download_once("https://example.com/model.bin", target, hf_token=None)
+
+        progress_messages = [message for message in info_messages if message.startswith("[download]")]
+        self.assertTrue(any("<1%" in message for message in progress_messages))
+        self.assertFalse(any(": 0%" in message for message in progress_messages))
+
+    def test_direct_download_reports_final_hundred_percent_when_expected_size_is_complete(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "model.bin"
+            info_messages: list[str] = []
+
+            def fake_download_file(url: str, target: Path, *, hf_token=None, on_progress=None, backend=None) -> None:
+                _ = (url, hf_token, backend)
+                target.write_bytes(b"ok")
+                if on_progress:
+                    on_progress(2, 2)
+
+            with (
+                patch("dynamic_comfyui_runtime.runtime.download.probe_remote_file_size", return_value=2),
+                patch("dynamic_comfyui_runtime.runtime.download.download_file", side_effect=fake_download_file),
+                patch("dynamic_comfyui_runtime.runtime.download.print_info", side_effect=info_messages.append),
+            ):
+                _download_once("https://example.com/model.bin", target, hf_token=None)
+
+        self.assertTrue(any("[download] model.bin: 100% (2 B/2 B)" in message for message in info_messages))
 
 
 if __name__ == "__main__":
