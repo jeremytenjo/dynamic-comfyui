@@ -138,7 +138,7 @@ def _download_once(url: str, target: Path, *, hf_token: str | None) -> None:
             )
             last_log_time = now
 
-    download_file(url, target, hf_token=hf_token, on_progress=_on_progress, backend="urllib")
+    download_file(url, target, hf_token=hf_token, on_progress=_on_progress)
     elapsed = time.monotonic() - start_time
     downloaded = target.stat().st_size if target.is_file() else 0
     if total_size and total_size > 0 and downloaded >= total_size and last_checkpoint < 100:

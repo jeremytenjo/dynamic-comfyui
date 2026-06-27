@@ -176,14 +176,10 @@ def download_file(
     *,
     hf_token: str | None = None,
     on_progress: callable | None = None,
-    backend: str | None = None,
 ) -> None:
-    selected_backend = backend or _DOWNLOAD_BACKEND
-    if selected_backend == "wget":
+    if _DOWNLOAD_BACKEND == "wget":
         _download_file_with_wget(url, target, hf_token=hf_token, on_progress=on_progress)
         return
-    if selected_backend != "urllib":
-        raise ValueError(f"Unsupported download backend: {selected_backend}")
     _download_file_with_urllib(url, target, hf_token=hf_token, on_progress=on_progress)
 
 

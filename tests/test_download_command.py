@@ -16,15 +16,15 @@ class DownloadCommandTests(unittest.TestCase):
         )
         self.assertEqual(name, "redcraft.safetensors")
 
-    def test_download_uses_env_hf_token_and_urllib_backend(self) -> None:
+    def test_download_uses_env_hf_token_and_default_backend(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             previous_cwd = Path.cwd()
             os.chdir(tmp)
-            calls: list[tuple[str | None, str | None]] = []
+            calls: list[str | None] = []
 
-            def fake_download_file(url: str, target: Path, *, hf_token=None, on_progress=None, backend=None) -> None:
+            def fake_download_file(url: str, target: Path, *, hf_token=None, on_progress=None) -> None:
                 _ = url
-                calls.append((hf_token, backend))
+                calls.append(hf_token)
                 target.write_bytes(b"ok")
                 if on_progress:
                     on_progress(2, 2)
@@ -43,7 +43,7 @@ class DownloadCommandTests(unittest.TestCase):
                 os.chdir(previous_cwd)
 
         self.assertEqual(target.name, "model.safetensors")
-        self.assertEqual(calls, [("env-token", "urllib")])
+        self.assertEqual(calls, ["env-token"])
         requires_token.assert_not_called()
 
     def test_hf_401_prompts_and_retries_with_token(self) -> None:
@@ -52,8 +52,8 @@ class DownloadCommandTests(unittest.TestCase):
             os.chdir(tmp)
             tokens: list[str | None] = []
 
-            def fake_download_file(url: str, target: Path, *, hf_token=None, on_progress=None, backend=None) -> None:
-                _ = (url, on_progress, backend)
+            def fake_download_file(url: str, target: Path, *, hf_token=None, on_progress=None) -> None:
+                _ = (url, on_progress)
                 tokens.append(hf_token)
                 if len(tokens) == 1:
                     raise RuntimeError("Download failed (401)")
@@ -81,8 +81,8 @@ class DownloadCommandTests(unittest.TestCase):
             target = Path(tmp) / "model.bin"
             info_messages: list[str] = []
 
-            def fake_download_file(url: str, target: Path, *, hf_token=None, on_progress=None, backend=None) -> None:
-                _ = (url, hf_token, backend)
+            def fake_download_file(url: str, target: Path, *, hf_token=None, on_progress=None) -> None:
+                _ = (url, hf_token)
                 if on_progress:
                     on_progress(1, 1_000)
                 target.write_bytes(b"x")
@@ -103,8 +103,8 @@ class DownloadCommandTests(unittest.TestCase):
             target = Path(tmp) / "model.bin"
             info_messages: list[str] = []
 
-            def fake_download_file(url: str, target: Path, *, hf_token=None, on_progress=None, backend=None) -> None:
-                _ = (url, hf_token, backend)
+            def fake_download_file(url: str, target: Path, *, hf_token=None, on_progress=None) -> None:
+                _ = (url, hf_token)
                 target.write_bytes(b"ok")
                 if on_progress:
                     on_progress(2, 2)

@@ -17,10 +17,8 @@ class InstallerDownloadCompletionTests(unittest.TestCase):
             comfyui_dir.mkdir(parents=True, exist_ok=True)
             spec = FileSpec(url="https://example.com/file.bin", target="models/file.bin")
 
-            def fake_download(
-                url: str, target: Path, *, hf_token: str | None = None, on_progress=None, backend: str | None = None
-            ) -> None:
-                _ = (url, hf_token, backend)
+            def fake_download(url: str, target: Path, *, hf_token: str | None = None, on_progress=None) -> None:
+                _ = (url, hf_token)
                 target.parent.mkdir(parents=True, exist_ok=True)
                 if on_progress is not None:
                     on_progress(10, 100)
@@ -41,10 +39,8 @@ class InstallerDownloadCompletionTests(unittest.TestCase):
             comfyui_dir.mkdir(parents=True, exist_ok=True)
             spec = FileSpec(url="https://example.com/file.bin", target="models/file.bin")
 
-            def fake_download(
-                url: str, target: Path, *, hf_token: str | None = None, on_progress=None, backend: str | None = None
-            ) -> None:
-                _ = (url, hf_token, backend)
+            def fake_download(url: str, target: Path, *, hf_token: str | None = None, on_progress=None) -> None:
+                _ = (url, hf_token)
                 target.parent.mkdir(parents=True, exist_ok=True)
                 if on_progress is not None:
                     on_progress(10, 100)
@@ -75,10 +71,8 @@ class InstallerDownloadCompletionTests(unittest.TestCase):
                 _ = hf_token
                 return 100 if url.endswith("one.bin") else 200
 
-            def fake_download(
-                url: str, target: Path, *, hf_token: str | None = None, on_progress=None, backend: str | None = None
-            ) -> None:
-                _ = (url, hf_token, backend)
+            def fake_download(url: str, target: Path, *, hf_token: str | None = None, on_progress=None) -> None:
+                _ = (url, hf_token)
                 target.parent.mkdir(parents=True, exist_ok=True)
                 size = fake_probe(url)
                 if target.name == "two.bin":
@@ -119,10 +113,8 @@ class InstallerDownloadCompletionTests(unittest.TestCase):
                 _ = hf_token
                 return 100 if url.endswith("one.bin") else 200
 
-            def fake_download(
-                url: str, target: Path, *, hf_token: str | None = None, on_progress=None, backend: str | None = None
-            ) -> None:
-                _ = (hf_token, backend)
+            def fake_download(url: str, target: Path, *, hf_token: str | None = None, on_progress=None) -> None:
+                _ = hf_token
                 target.parent.mkdir(parents=True, exist_ok=True)
                 if url.endswith("two.bin"):
                     time.sleep(0.05)

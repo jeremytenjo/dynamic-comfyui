@@ -318,13 +318,7 @@ def install_files(
                         )
                         last_log_time_by_target[file_spec.target] = now
 
-            download_file(
-                file_spec.url,
-                target_path,
-                hf_token=hf_token,
-                on_progress=_on_download_progress,
-                backend="urllib",
-            )
+            download_file(file_spec.url, target_path, hf_token=hf_token, on_progress=_on_download_progress)
             if not target_path.is_file():
                 raise RuntimeError("Download completed but target file is missing on disk")
             if known_size is not None and known_size > 0:
