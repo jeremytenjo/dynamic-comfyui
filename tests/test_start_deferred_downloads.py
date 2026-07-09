@@ -1,0 +1,103 @@
+from __future__ import annotations
+
+import tempfile
+import unittest
+from contextlib import ExitStack
+from pathlib import Path
+from unittest.mock import patch
+
+from dynamic_comfyui_runtime.runtime.manifests import FileSpec, MergedManifest
+from dynamic_comfyui_runtime.runtime.operations import RuntimeContext, run_comfyui_install_flow_foreground
+from dynamic_comfyui_runtime.runtime.start_deferred_downloads import split_start_deferred_files
+
+
+class StartDeferredDownloadsTests(unittest.TestCase):
+    def _merged(self) -> MergedManifest:
+        normal = FileSpec(url="https://example.com/normal.bin", target="models/normal.bin")
+        deferred = FileSpec(
+            url="https://example.com/deferred.bin",
+            target="models/deferred.bin",
+            start_comfyui_before_downloading=True,
+        )
+        return MergedManifest(
+            merged_custom_nodes=[],
+            merged_files=[normal, deferred],
+            default_custom_nodes=[],
+            project_custom_nodes=[],
+            default_files=[],
+            project_files=[normal, deferred],
+        )
+
+    def test_split_start_deferred_files_removes_deferred_targets_from_initial_manifest(self) -> None:
+        initial, deferred = split_start_deferred_files(self._merged())
+
+        self.assertEqual([spec.target for spec in initial.merged_files], ["models/normal.bin"])
+        self.assertEqual([spec.target for spec in initial.project_files], ["models/normal.bin"])
+        self.assertEqual([spec.target for spec in deferred], ["models/deferred.bin"])
+
+    def test_foreground_start_launches_deferred_download_after_comfyui_starts(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            comfyui_dir = root / "ComfyUI"
+            custom_nodes_dir = comfyui_dir / "custom_nodes"
+            manifest_path = root / "project.json"
+            ctx = RuntimeContext(
+                network_volume=root,
+                package_json_path=root / "package.json",
+                setup_page_html_path=root / "setup_page.html",
+                configured_network_volume=root,
+            )
+            installed_targets: list[list[str]] = []
+
+            def fake_install_files(files: list[FileSpec], *args, **kwargs):
+                _ = args, kwargs
+                installed_targets.append([spec.target for spec in files])
+                return []
+
+            def fake_start_foreground(*args, **kwargs):
+                _ = args
+                after_start = kwargs.get("after_start")
+                self.assertIsNotNone(after_start)
+                after_start()
+
+            with ExitStack() as stack:
+                stack.enter_context(patch("dynamic_comfyui_runtime.runtime.operations.set_network_volume_default", return_value=root))
+                stack.enter_context(patch("dynamic_comfyui_runtime.runtime.operations.clear_install_sentinel"))
+                stack.enter_context(patch(
+                    "dynamic_comfyui_runtime.runtime.operations.ensure_comfyui_workspace",
+                    return_value=(comfyui_dir, custom_nodes_dir),
+                ))
+                stack.enter_context(patch("dynamic_comfyui_runtime.runtime.operations.set_model_directories"))
+                stack.enter_context(patch("dynamic_comfyui_runtime.runtime.operations.require_tools"))
+                stack.enter_context(patch("dynamic_comfyui_runtime.runtime.operations._load_manifest_context", return_value=(self._merged(), None)))
+                stack.enter_context(patch("dynamic_comfyui_runtime.runtime.operations._ensure_hf_token_for_pending_downloads", return_value="hf-token"))
+                stack.enter_context(patch("dynamic_comfyui_runtime.runtime.operations._print_install_plan_preview"))
+                stack.enter_context(patch("dynamic_comfyui_runtime.runtime.operations.mark_running"))
+                stack.enter_context(patch("dynamic_comfyui_runtime.runtime.operations.print_rule"))
+                stack.enter_context(patch("dynamic_comfyui_runtime.runtime.operations.ensure_comfy_cli_ready"))
+                stack.enter_context(patch("dynamic_comfyui_runtime.runtime.operations.verify_comfyui_core_workspace"))
+                stack.enter_context(patch("dynamic_comfyui_runtime.runtime.operations.enable_manager_gui"))
+                stack.enter_context(patch("dynamic_comfyui_runtime.runtime.operations.install_custom_nodes", return_value=[]))
+                stack.enter_context(patch("dynamic_comfyui_runtime.runtime.operations.install_files", side_effect=fake_install_files))
+                stack.enter_context(patch("dynamic_comfyui_runtime.runtime.operations._retry_hf_401_file_downloads", return_value=[]))
+                stack.enter_context(patch("dynamic_comfyui_runtime.runtime.operations.write_install_sentinel"))
+                stack.enter_context(patch("dynamic_comfyui_runtime.runtime.operations.mark_done"))
+                stack.enter_context(patch("dynamic_comfyui_runtime.runtime.operations._print_resource_summary"))
+                start_background = stack.enter_context(patch(
+                    "dynamic_comfyui_runtime.runtime.operations.start_background_deferred_file_downloads"
+                ))
+                stack.enter_context(patch(
+                    "dynamic_comfyui_runtime.runtime.operations.start_comfyui_service_foreground",
+                    side_effect=fake_start_foreground,
+                ))
+                run_comfyui_install_flow_foreground(ctx, manifest_path, defer_start_files=True)
+
+            self.assertEqual(installed_targets, [["models/normal.bin"]])
+            start_background.assert_called_once()
+            self.assertEqual(start_background.call_args.args[0][0].target, "models/deferred.bin")
+            self.assertEqual(start_background.call_args.args[1], comfyui_dir)
+            self.assertEqual(start_background.call_args.kwargs["hf_token"], "hf-token")
+
+
+if __name__ == "__main__":
+    unittest.main()

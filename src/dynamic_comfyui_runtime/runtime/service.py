@@ -418,7 +418,10 @@ def start_comfyui_service_via_main_py(comfyui_dir: Path, install_start_ts: int |
 
 
 def start_comfyui_service_foreground(
-    comfyui_dir: Path, network_volume: Path, install_start_ts: int | None = None
+    comfyui_dir: Path,
+    network_volume: Path,
+    install_start_ts: int | None = None,
+    after_start: callable | None = None,
 ) -> None:
     _ = install_start_ts
     health_url = "http://127.0.0.1:8188/system_stats"
@@ -461,6 +464,8 @@ def start_comfyui_service_foreground(
         ],
         cwd=str(comfyui_dir),
     )
+    if after_start:
+        after_start()
     try:
         returncode = proc.wait()
     except KeyboardInterrupt:

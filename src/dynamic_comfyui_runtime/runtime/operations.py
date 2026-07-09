@@ -62,6 +62,7 @@ from .service import (
     verify_comfyui_core_workspace,
     resolve_runpod_proxy_url,
 )
+from .start_deferred_downloads import split_start_deferred_files, start_background_deferred_file_downloads
 from .system_info import collect_system_info, print_system_info
 from .ui import (
     console,
@@ -95,6 +96,8 @@ class InstallExecution:
     merged: MergedManifest
     node_failures: list[NodeInstallFailure]
     file_failures: list[FileInstallFailure]
+    deferred_files: list[FileSpec] | None = None
+    hf_token: str | None = None
 
 
 def _settings_network_volume(ctx: RuntimeContext) -> Path:
@@ -534,6 +537,7 @@ def _execute_dependency_install(
     manager_quiet: bool,
     default_manifest_path: Path | None = None,
     hf_token: str | None = None,
+    defer_start_files: bool = False,
 ) -> InstallExecution:
     print_rule("Dependency Install")
     network_volume = set_network_volume_default(ctx.network_volume)
@@ -551,8 +555,13 @@ def _execute_dependency_install(
     if not hf_token:
         hf_token = loaded_hf_token
     hf_token = _ensure_hf_token_for_pending_downloads(merged, comfyui_dir, hf_token)
-    _print_install_plan_preview(merged, custom_nodes_dir, comfyui_dir, hf_token)
-    mark_running(merged, comfyui_dir)
+    install_merged, deferred_files = split_start_deferred_files(merged) if defer_start_files else (merged, [])
+    if deferred_files:
+        print_info(
+            f"Deferring {len(deferred_files)} file download(s) until after ComfyUI starts."
+        )
+    _print_install_plan_preview(install_merged, custom_nodes_dir, comfyui_dir, hf_token)
+    mark_running(install_merged, comfyui_dir)
 
     print_rule("ComfyUI Core")
     with status("Ensuring ComfyUI core workspace is installed..."):
@@ -562,27 +571,34 @@ def _execute_dependency_install(
 
     print_rule("Custom Nodes")
     node_failures = install_custom_nodes(
-        merged.merged_custom_nodes, custom_nodes_dir, on_progress=lambda: mark_running(merged, comfyui_dir)
+        install_merged.merged_custom_nodes,
+        custom_nodes_dir,
+        on_progress=lambda: mark_running(install_merged, comfyui_dir),
     )
 
     print_rule("Files")
     file_failures = install_files(
-        merged.merged_files, comfyui_dir, hf_token=hf_token, on_progress=lambda: mark_running(merged, comfyui_dir)
+        install_merged.merged_files,
+        comfyui_dir,
+        hf_token=hf_token,
+        on_progress=lambda: mark_running(install_merged, comfyui_dir),
     )
     file_failures = _retry_hf_401_file_downloads(
-        merged,
+        install_merged,
         comfyui_dir,
         file_failures,
-        on_progress=lambda: mark_running(merged, comfyui_dir),
+        on_progress=lambda: mark_running(install_merged, comfyui_dir),
     )
 
     return InstallExecution(
         network_volume=network_volume,
         comfyui_dir=comfyui_dir,
         custom_nodes_dir=custom_nodes_dir,
-        merged=merged,
+        merged=install_merged,
         node_failures=node_failures,
         file_failures=file_failures,
+        deferred_files=deferred_files,
+        hf_token=hf_token,
     )
 
 
@@ -608,10 +624,20 @@ def run_comfyui_install_flow(ctx: RuntimeContext, project_manifest_path: Path) -
         print_info(line)
 
 
-def run_comfyui_install_flow_foreground(ctx: RuntimeContext, project_manifest_path: Path) -> None:
+def run_comfyui_install_flow_foreground(
+    ctx: RuntimeContext,
+    project_manifest_path: Path,
+    *,
+    defer_start_files: bool = False,
+) -> None:
     ctx.install_start_ts = now_epoch()
     clear_install_sentinel(set_network_volume_default(ctx.network_volume))
-    execution = _execute_dependency_install(ctx, project_manifest_path, manager_quiet=False)
+    execution = _execute_dependency_install(
+        ctx,
+        project_manifest_path,
+        manager_quiet=False,
+        defer_start_files=defer_start_files,
+    )
 
     write_install_sentinel(execution.network_volume, execution.comfyui_dir)
     mark_done(execution.merged, execution.comfyui_dir)
@@ -623,7 +649,18 @@ def run_comfyui_install_flow_foreground(ctx: RuntimeContext, project_manifest_pa
         execution.file_failures,
     )
     start_comfyui_service_foreground(
-        execution.comfyui_dir, execution.network_volume, install_start_ts=ctx.install_start_ts
+        execution.comfyui_dir,
+        execution.network_volume,
+        install_start_ts=ctx.install_start_ts,
+        after_start=(
+            lambda: start_background_deferred_file_downloads(
+                execution.deferred_files or [],
+                execution.comfyui_dir,
+                hf_token=execution.hf_token,
+            )
+        )
+        if execution.deferred_files
+        else None,
     )
 
 
@@ -651,7 +688,8 @@ def run_dependency_install_flow(
     hf_token: str | None = None,
     show_completion: bool = True,
     show_comfyui_link: bool = True,
-) -> None:
+    defer_start_files: bool = False,
+) -> InstallExecution:
     ctx.install_start_ts = now_epoch()
     execution = _execute_dependency_install(
         ctx,
@@ -659,6 +697,7 @@ def run_dependency_install_flow(
         manager_quiet=True,
         default_manifest_path=default_manifest_path,
         hf_token=hf_token,
+        defer_start_files=defer_start_files,
     )
 
     mark_done(execution.merged, execution.comfyui_dir)
@@ -673,6 +712,7 @@ def run_dependency_install_flow(
         print_info(_dependency_completion_message(ctx))
     if show_comfyui_link:
         _print_comfyui_link()
+    return execution
 
 
 def cmd_install(ctx: RuntimeContext) -> None:
@@ -737,14 +777,29 @@ def cmd_start(ctx: RuntimeContext, project_url: str | None = None) -> None:
     _save_selected_project(network_volume, manifest_path, source_url)
     try:
         if on_install_complete_commands:
-            run_dependency_install_flow(ctx, manifest_path)
+            execution = run_dependency_install_flow(
+                ctx,
+                manifest_path,
+                show_comfyui_link=False,
+                defer_start_files=True,
+            )
             confirm_and_run_on_install_complete_commands(on_install_complete_commands, cwd=network_volume)
-            comfyui_dir, _ = ensure_comfyui_workspace(network_volume)
             start_comfyui_service_foreground(
-                comfyui_dir, network_volume, install_start_ts=ctx.install_start_ts
+                execution.comfyui_dir,
+                execution.network_volume,
+                install_start_ts=ctx.install_start_ts,
+                after_start=(
+                    lambda: start_background_deferred_file_downloads(
+                        execution.deferred_files or [],
+                        execution.comfyui_dir,
+                        hf_token=execution.hf_token,
+                    )
+                )
+                if execution.deferred_files
+                else None,
             )
         else:
-            run_comfyui_install_flow_foreground(ctx, manifest_path)
+            run_comfyui_install_flow_foreground(ctx, manifest_path, defer_start_files=True)
     except Exception as exc:
         comfyui_dir, _ = ensure_comfyui_workspace(network_volume)
         mark_failed(None, comfyui_dir, f"Installation failed. {exc}")

@@ -20,6 +20,7 @@ class CustomNode:
 class FileSpec:
     url: str
     target: str
+    start_comfyui_before_downloading: bool = False
 
 
 @dataclass(frozen=True)
@@ -93,7 +94,16 @@ def _parse_manifest(path: Path) -> ManifestData:
             raise ValueError(f"files[{idx}] requires 'url' and 'target'")
         if target.startswith("/"):
             raise ValueError(f"files[{idx}].target must be relative to ComfyUI root")
-        files.append(FileSpec(url=url, target=target))
+        start_comfyui_before_downloading = item.get("start_comfyui_before_downloading", False)
+        if not isinstance(start_comfyui_before_downloading, bool):
+            raise ValueError(f"files[{idx}].start_comfyui_before_downloading must be a boolean")
+        files.append(
+            FileSpec(
+                url=url,
+                target=target,
+                start_comfyui_before_downloading=start_comfyui_before_downloading,
+            )
+        )
 
     raw_imports = data.get("import_projects", [])
     if raw_imports is None:

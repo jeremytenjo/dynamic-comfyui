@@ -58,6 +58,49 @@ class ManifestImportsTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 manifests.load_manifest_data(project_manifest)
 
+    def test_file_start_comfyui_before_downloading_parsed(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            project_manifest = root / "project.json"
+            _write_json(
+                project_manifest,
+                {
+                    "custom_nodes": [],
+                    "files": [
+                        {
+                            "url": "https://example.com/model.bin",
+                            "target": "models/model.bin",
+                            "start_comfyui_before_downloading": True,
+                        }
+                    ],
+                },
+            )
+
+            data = manifests.load_manifest_data(project_manifest)
+
+            self.assertTrue(data.files[0].start_comfyui_before_downloading)
+
+    def test_file_start_comfyui_before_downloading_invalid_type_raises(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            project_manifest = root / "project.json"
+            _write_json(
+                project_manifest,
+                {
+                    "custom_nodes": [],
+                    "files": [
+                        {
+                            "url": "https://example.com/model.bin",
+                            "target": "models/model.bin",
+                            "start_comfyui_before_downloading": "true",
+                        }
+                    ],
+                },
+            )
+
+            with self.assertRaises(ValueError):
+                manifests.load_manifest_data(project_manifest)
+
     def test_import_projects_requires_project_url_only(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
