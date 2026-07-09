@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## 2026-07-09
+
+### Added
+- Added `start_comfyui_before_downloading` for project JSON file entries so `dc start` can launch ComfyUI before downloading selected large files in the background.
+
 ## 2026-05-25
 
 ### Added
