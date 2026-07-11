@@ -517,7 +517,7 @@ def _print_resource_summary(
                 exists = (custom_nodes_dir / node.repo_dir).is_dir()
                 failure = node_failure_map.get(node.repo_dir)
                 if failure is not None:
-                    status = f"[error]Failed: {failure.error}[/]"
+                    status = "[error]Error[/]"
                 else:
                     status = "[success]Success[/]" if exists else "[error]Failed: missing on disk[/]"
                 nodes_table.add_row(node.repo_dir, node.repo, status)
@@ -541,7 +541,7 @@ def _print_resource_summary(
                     total_installed_bytes += file_path.stat().st_size
                 failure = file_failure_map.get(spec.target)
                 if failure is not None:
-                    status = f"[error]Failed: {failure.error}[/]"
+                    status = "[error]Error[/]"
                 else:
                     status = "[success]Success[/]" if exists else "[error]Failed: missing on disk[/]"
                 files_table.add_row(
