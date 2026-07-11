@@ -7,8 +7,20 @@ from pathlib import Path
 from unittest.mock import patch
 
 from dynamic_comfyui_runtime.runtime.manifests import FileSpec, MergedManifest
-from dynamic_comfyui_runtime.runtime.operations import RuntimeContext, run_comfyui_install_flow_foreground
+from dynamic_comfyui_runtime.runtime.operations import (
+    RuntimeContext,
+    _print_install_plan_preview,
+    run_comfyui_install_flow_foreground,
+)
 from dynamic_comfyui_runtime.runtime.start_deferred_downloads import split_start_deferred_files
+
+
+class CapturingConsole:
+    def __init__(self) -> None:
+        self.printed: list[object] = []
+
+    def print(self, item: object) -> None:
+        self.printed.append(item)
 
 
 class StartDeferredDownloadsTests(unittest.TestCase):
@@ -34,6 +46,48 @@ class StartDeferredDownloadsTests(unittest.TestCase):
         self.assertEqual([spec.target for spec in initial.merged_files], ["models/normal.bin"])
         self.assertEqual([spec.target for spec in initial.project_files], ["models/normal.bin"])
         self.assertEqual([spec.target for spec in deferred], ["models/deferred.bin"])
+
+    def test_install_plan_table_shows_deferred_download_timing_only_when_pending(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            initial, deferred = split_start_deferred_files(self._merged())
+            fake_console = CapturingConsole()
+
+            with (
+                patch("dynamic_comfyui_runtime.runtime.operations.print_rule"),
+                patch("dynamic_comfyui_runtime.runtime.operations.console", return_value=fake_console),
+                patch("dynamic_comfyui_runtime.runtime.operations.probe_remote_file_size", return_value=1024),
+            ):
+                _print_install_plan_preview(initial, root / "custom_nodes", root, None, deferred_files=deferred)
+
+            tables = fake_console.printed
+            self.assertEqual(len(tables), 1)
+            headers = [column.header for column in tables[0].columns]
+            self.assertEqual(headers, ["File", "Source", "Timing", "Size"])
+            timing_cells = tables[0].columns[2]._cells
+            self.assertIn("Before ComfyUI", timing_cells)
+            self.assertIn("After ComfyUI starts", timing_cells)
+
+    def test_install_plan_table_omits_timing_column_without_pending_deferred_downloads(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            initial, deferred = split_start_deferred_files(self._merged())
+            deferred_path = root / "models" / "deferred.bin"
+            deferred_path.parent.mkdir(parents=True, exist_ok=True)
+            deferred_path.write_text("already downloaded", encoding="utf-8")
+            fake_console = CapturingConsole()
+
+            with (
+                patch("dynamic_comfyui_runtime.runtime.operations.print_rule"),
+                patch("dynamic_comfyui_runtime.runtime.operations.console", return_value=fake_console),
+                patch("dynamic_comfyui_runtime.runtime.operations.probe_remote_file_size", return_value=1024),
+            ):
+                _print_install_plan_preview(initial, root / "custom_nodes", root, None, deferred_files=deferred)
+
+            tables = fake_console.printed
+            self.assertEqual(len(tables), 1)
+            headers = [column.header for column in tables[0].columns]
+            self.assertEqual(headers, ["File", "Source", "Size"])
 
     def test_foreground_start_launches_deferred_download_after_comfyui_starts(self) -> None:
         with tempfile.TemporaryDirectory() as td:

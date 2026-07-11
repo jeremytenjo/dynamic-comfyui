@@ -405,7 +405,14 @@ def _ensure_hf_token_for_manifest_batch(
     return token
 
 
-def _print_install_plan_preview(merged: MergedManifest, custom_nodes_dir: Path, comfyui_dir: Path, hf_token: str | None) -> None:
+def _print_install_plan_preview(
+    merged: MergedManifest,
+    custom_nodes_dir: Path,
+    comfyui_dir: Path,
+    hf_token: str | None,
+    *,
+    deferred_files: list[FileSpec] | None = None,
+) -> None:
     print_rule("Install Plan")
 
     planned_nodes = Table()
@@ -421,16 +428,14 @@ def _print_install_plan_preview(merged: MergedManifest, custom_nodes_dir: Path, 
     if pending_node_rows > 0:
         console().print(planned_nodes)
 
-    planned_files = Table()
-    planned_files.add_column("File", overflow="ellipsis", no_wrap=True)
-    planned_files.add_column("Source", overflow="ellipsis", no_wrap=True)
-    planned_files.add_column("Size", justify="right")
     seen_targets: set[str] = set()
     pending_file_rows = 0
-    file_rows: list[tuple[str, str, str, int | None]] = []
+    file_rows: list[tuple[str, str, str, str, int | None]] = []
     known_total_bytes = 0
     unknown_size_count = 0
-    for specs in (merged.default_files, merged.project_files):
+
+    def _add_pending_file_rows(specs: list[FileSpec], timing: str) -> None:
+        nonlocal known_total_bytes, pending_file_rows, unknown_size_count
         for spec in specs:
             normalized_target = Path(spec.target).as_posix()
             if normalized_target in seen_targets:
@@ -440,20 +445,48 @@ def _print_install_plan_preview(merged: MergedManifest, custom_nodes_dir: Path, 
                 continue
             remote_size = probe_remote_file_size(spec.url, hf_token=hf_token)
             size_display = format_size_for_display(remote_size) if remote_size and remote_size > 0 else "unknown"
-            file_rows.append((normalized_target, spec.url, size_display, remote_size if remote_size and remote_size > 0 else None))
+            file_rows.append(
+                (
+                    normalized_target,
+                    spec.url,
+                    timing,
+                    size_display,
+                    remote_size if remote_size and remote_size > 0 else None,
+                )
+            )
             if remote_size and remote_size > 0:
                 known_total_bytes += remote_size
             else:
                 unknown_size_count += 1
             pending_file_rows += 1
-    file_rows.sort(key=lambda row: (row[3] is None, -(row[3] or 0), row[0]))
-    for target, source, size_display, _size_bytes in file_rows:
-        planned_files.add_row(target, source, size_display)
+
+    for specs in (merged.default_files, merged.project_files):
+        _add_pending_file_rows(specs, "Before ComfyUI")
+    if deferred_files:
+        _add_pending_file_rows(deferred_files, "After ComfyUI starts")
+
+    show_timing = any(row[2] == "After ComfyUI starts" for row in file_rows)
+    planned_files = Table()
+    planned_files.add_column("File", overflow="ellipsis", no_wrap=True)
+    planned_files.add_column("Source", overflow="ellipsis", no_wrap=True)
+    if show_timing:
+        planned_files.add_column("Timing")
+    planned_files.add_column("Size", justify="right")
+
+    file_rows.sort(key=lambda row: (row[4] is None, -(row[4] or 0), row[0]))
+    for target, source, timing, size_display, _size_bytes in file_rows:
+        if show_timing:
+            planned_files.add_row(target, source, timing, size_display)
+        else:
+            planned_files.add_row(target, source, size_display)
     if pending_file_rows > 0:
         total_display = format_size_for_display(known_total_bytes)
         if unknown_size_count > 0:
             total_display = f"{total_display}"
-        planned_files.add_row("[bold]Total[/]", "-", f"[bold]{total_display}[/]")
+        if show_timing:
+            planned_files.add_row("[bold]Total[/]", "-", "-", f"[bold]{total_display}[/]")
+        else:
+            planned_files.add_row("[bold]Total[/]", "-", f"[bold]{total_display}[/]")
     if pending_file_rows > 0:
         console().print(planned_files)
 
@@ -560,7 +593,13 @@ def _execute_dependency_install(
         print_info(
             f"Deferring {len(deferred_files)} file download(s) until after ComfyUI starts."
         )
-    _print_install_plan_preview(install_merged, custom_nodes_dir, comfyui_dir, hf_token)
+    _print_install_plan_preview(
+        install_merged,
+        custom_nodes_dir,
+        comfyui_dir,
+        hf_token,
+        deferred_files=deferred_files,
+    )
     mark_running(install_merged, comfyui_dir)
 
     print_rule("ComfyUI Core")
