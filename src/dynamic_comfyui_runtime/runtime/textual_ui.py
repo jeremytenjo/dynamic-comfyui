@@ -288,7 +288,16 @@ def run_install_tui(title: str, worker: Callable[[InstallEventSink], T]) -> T:
                 progress_bar.update(total=None, progress=0)
 
         def prompt_secret(self, message: str) -> str:
-            return self.push_screen_wait(_SecretPrompt(message))
+            result: list[str] = []
+            dismissed = threading.Event()
+
+            def _on_dismiss(value: str) -> None:
+                result.append(value)
+                dismissed.set()
+
+            self.call_from_thread(self.push_screen, _SecretPrompt(message), _on_dismiss)
+            dismissed.wait()
+            return result[0] if result else ""
 
     result = _InstallApp().run()
     if result is None:
