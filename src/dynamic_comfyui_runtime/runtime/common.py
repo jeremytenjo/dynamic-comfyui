@@ -82,7 +82,7 @@ def ensure_wget_available() -> bool:
     _WGET_INSTALL_ATTEMPTED = True
 
     if not command_exists("apt-get"):
-        print_info("wget is unavailable and apt-get is not installed; falling back to urllib downloader.")
+        print_info("wget is unavailable and apt-get is not installed.")
         return False
 
     print_info("wget is unavailable. Installing wget...")
@@ -90,14 +90,14 @@ def ensure_wget_available() -> bool:
         run(["apt-get", "update", "--yes"], timeout=180)
         run(["apt-get", "install", "--yes", "--no-install-recommends", "wget"], timeout=180)
     except Exception as exc:
-        print_info(f"wget installation failed; falling back to urllib downloader. ({exc})")
+        print_info(f"wget installation failed. ({exc})")
         return False
 
     if command_exists("wget"):
         print_info("wget installed successfully.")
         return True
 
-    print_info("wget installation completed but command is still unavailable; falling back to urllib downloader.")
+    print_info("wget installation completed but command is still unavailable.")
     return False
 
 
@@ -207,8 +207,7 @@ def _download_file_with_wget(
 ) -> None:
     ensure_dir(target.parent)
     if not ensure_wget_available():
-        _download_file_with_urllib(url, target, hf_token=hf_token, on_progress=on_progress)
-        return
+        raise RuntimeError("wget is required for downloads but is unavailable and could not be installed.")
 
     total_size = probe_remote_file_size(url, hf_token=hf_token)
     if total_size and total_size > 0:

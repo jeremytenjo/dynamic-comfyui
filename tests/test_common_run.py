@@ -70,6 +70,20 @@ class CommonRunTests(unittest.TestCase):
 
             self.assertEqual(progress, [(10, 100), (50, 100), (100, 100)])
 
+    def test_wget_download_errors_when_wget_unavailable(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            target = Path(td) / "model.bin"
+
+            with (
+                patch("dynamic_comfyui_runtime.runtime.common.ensure_wget_available", return_value=False),
+                patch("dynamic_comfyui_runtime.runtime.common._download_file_with_urllib") as urllib_download,
+            ):
+                with self.assertRaises(RuntimeError) as raised:
+                    _download_file_with_wget("https://example.com/model.bin", target)
+
+            self.assertIn("wget is required for downloads", str(raised.exception))
+            urllib_download.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()
