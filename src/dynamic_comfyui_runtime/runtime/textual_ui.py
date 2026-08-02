@@ -180,8 +180,9 @@ def run_install_tui(title: str, worker: Callable[[InstallEventSink], T]) -> T:
             height: 1;
         }
 
-        #install-title-spacer {
+        #install-title {
             width: 1fr;
+            text-style: bold;
         }
 
         #install-timer {
@@ -240,7 +241,7 @@ def run_install_tui(title: str, worker: Callable[[InstallEventSink], T]) -> T:
         def compose(self) -> ComposeResult:
             with Vertical(id="body"):
                 with Horizontal(id="install-title-row"):
-                    yield Static("", id="install-title-spacer")
+                    yield Static(title, id="install-title")
                     yield Static("00:00:00", id="install-timer")
                 with Vertical(id="main-panels"):
                     with Vertical(id="nodes-panel", classes="panel"):

@@ -93,6 +93,7 @@ class StartHooksTests(unittest.TestCase):
                 provided_manifest,
                 show_comfyui_link=False,
                 defer_start_files=True,
+                ui_title="provided",
             )
             confirm_and_run_hooks.assert_called_once_with(["echo provided"], cwd=root)
             run_comfyui_foreground.assert_called_once()
@@ -125,7 +126,7 @@ class StartHooksTests(unittest.TestCase):
 
             prepare_manifest.assert_called_once_with(detected_root, "https://example.com/project.json")
             save_project.assert_called_once_with(detected_root, manifest, "https://example.com/project.json")
-            install_flow.assert_called_once_with(ctx, manifest, defer_start_files=True)
+            install_flow.assert_called_once_with(ctx, manifest, defer_start_files=True, ui_title="project")
             self.assertEqual(ctx.network_volume, detected_root)
 
     def test_start_uses_foreground_comfyui_install_flow_when_manifest_has_no_hook_commands(self) -> None:
@@ -152,7 +153,7 @@ class StartHooksTests(unittest.TestCase):
             ):
                 cmd_start(ctx, "https://example.com/project.json")
 
-            run_comfyui_install.assert_called_once_with(ctx, manifest, defer_start_files=True)
+            run_comfyui_install.assert_called_once_with(ctx, manifest, defer_start_files=True, ui_title="project")
             run_dependency_install.assert_not_called()
             confirm_and_run_hooks.assert_not_called()
 

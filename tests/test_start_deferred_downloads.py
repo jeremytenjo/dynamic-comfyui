@@ -17,7 +17,11 @@ from dynamic_comfyui_runtime.runtime.operations import (
 )
 from dynamic_comfyui_runtime.runtime.start_deferred_downloads import split_start_deferred_files
 from dynamic_comfyui_runtime.runtime.install_events import InstallEvent
-from dynamic_comfyui_runtime.runtime.textual_ui import _elapsed_label, _node_detail, _node_display_name
+from dynamic_comfyui_runtime.runtime.textual_ui import (
+    _elapsed_label,
+    _node_detail,
+    _node_display_name,
+)
 
 
 class CapturingConsole:

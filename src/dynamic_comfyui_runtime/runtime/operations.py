@@ -7,7 +7,7 @@ from pathlib import Path
 
 from rich.table import Table
 
-from .banner import print_project_banner
+from .banner import print_project_banner, project_name_from_manifest_url
 from .common import ensure_dir, format_size_for_display, now_epoch, probe_remote_file_size, require_tools, utc_timestamp
 from .install_events import InstallEvent, InstallEventSink
 from .default_manifest_url import (
@@ -741,10 +741,10 @@ def _run_comfyui_install_flow_plain(
         print_info(line)
 
 
-def run_comfyui_install_flow(ctx: RuntimeContext, project_manifest_path: Path) -> None:
+def run_comfyui_install_flow(ctx: RuntimeContext, project_manifest_path: Path, *, ui_title: str | None = None) -> None:
     if should_use_textual():
         run_install_tui(
-            "Dynamic ComfyUI install",
+            ui_title or "Dynamic ComfyUI install",
             lambda event_sink: _run_comfyui_install_flow_plain(ctx, project_manifest_path, event_sink=event_sink),
         )
         return
@@ -798,10 +798,11 @@ def run_comfyui_install_flow_foreground(
     project_manifest_path: Path,
     *,
     defer_start_files: bool = False,
+    ui_title: str | None = None,
 ) -> None:
     if should_use_textual():
         run_install_tui(
-            "Dynamic ComfyUI start",
+            ui_title or "Dynamic ComfyUI start",
             lambda event_sink: _run_comfyui_install_flow_foreground_plain(
                 ctx,
                 project_manifest_path,
@@ -875,10 +876,11 @@ def run_dependency_install_flow(
     show_completion: bool = True,
     show_comfyui_link: bool = True,
     defer_start_files: bool = False,
+    ui_title: str | None = None,
 ) -> InstallExecution:
     if should_use_textual():
         return run_install_tui(
-            "Dynamic ComfyUI dependency install",
+            ui_title or "Dynamic ComfyUI dependency install",
             lambda event_sink: _run_dependency_install_flow_plain(
                 ctx,
                 project_manifest_path,
@@ -937,6 +939,10 @@ def _save_selected_project(network_volume: Path, manifest_path: Path, source_url
     print_success("Selected project: active-project")
 
 
+def _install_ui_title(source_url: str, fallback: str) -> str:
+    return project_name_from_manifest_url(source_url) if source_url else fallback
+
+
 def cmd_start(ctx: RuntimeContext, project_url: str | None = None) -> None:
     configure_process_env()
     network_volume = set_network_volume_default(ctx.network_volume)
@@ -968,6 +974,7 @@ def cmd_start(ctx: RuntimeContext, project_url: str | None = None) -> None:
                 manifest_path,
                 show_comfyui_link=False,
                 defer_start_files=True,
+                ui_title=_install_ui_title(source_url, "Dynamic ComfyUI dependency install"),
             )
             confirm_and_run_on_install_complete_commands(on_install_complete_commands, cwd=network_volume)
             start_comfyui_service_foreground(
@@ -985,7 +992,12 @@ def cmd_start(ctx: RuntimeContext, project_url: str | None = None) -> None:
                 else None,
             )
         else:
-            run_comfyui_install_flow_foreground(ctx, manifest_path, defer_start_files=True)
+            run_comfyui_install_flow_foreground(
+                ctx,
+                manifest_path,
+                defer_start_files=True,
+                ui_title=_install_ui_title(source_url, "Dynamic ComfyUI start"),
+            )
     except Exception as exc:
         comfyui_dir, _ = ensure_comfyui_workspace(network_volume)
         mark_failed(None, comfyui_dir, f"Installation failed. {exc}")
@@ -1010,7 +1022,11 @@ def cmd_install_deps(ctx: RuntimeContext, project_urls: list[str] | None = None)
         _save_selected_project(network_volume, manifest_path, source_url)
         ctx.network_volume = network_volume
         try:
-            run_dependency_install_flow(ctx, manifest_path)
+            run_dependency_install_flow(
+                ctx,
+                manifest_path,
+                ui_title=_install_ui_title(source_url, "Dynamic ComfyUI dependency install"),
+            )
         except Exception as exc:
             comfyui_dir, _ = ensure_comfyui_workspace(network_volume)
             mark_failed(None, comfyui_dir, f"Dependency installation failed. {exc}")
@@ -1063,6 +1079,7 @@ def cmd_install_deps(ctx: RuntimeContext, project_urls: list[str] | None = None)
                 hf_token=shared_hf_token,
                 show_completion=False,
                 show_comfyui_link=False,
+                ui_title=_install_ui_title(source_url, "Dynamic ComfyUI dependency install"),
             )
         except Exception as exc:
             comfyui_dir, _ = ensure_comfyui_workspace(network_volume)
@@ -1119,6 +1136,7 @@ def cmd_install_default_deps(ctx: RuntimeContext) -> None:
         ctx,
         empty_project_manifest_path,
         default_manifest_path=default_manifest_path,
+        ui_title=_install_ui_title(default_url, "Dynamic ComfyUI dependency install"),
     )
 
 
@@ -1215,12 +1233,12 @@ def cmd_start_new_project(ctx: RuntimeContext) -> None:
             break
 
     _save_selected_project(network_volume, manifest_path, source_url)
-    run_comfyui_install_flow(ctx, manifest_path)
+    run_comfyui_install_flow(ctx, manifest_path, ui_title=_install_ui_title(source_url, "Dynamic ComfyUI install"))
 
     if cleanup_previous and snapshot and snapshot.is_file():
         comfyui_dir, custom_nodes_dir = ensure_comfyui_workspace(network_volume)
         _cleanup_previous_resources(snapshot, custom_nodes_dir, comfyui_dir)
-        run_comfyui_install_flow(ctx, manifest_path)
+        run_comfyui_install_flow(ctx, manifest_path, ui_title=_install_ui_title(source_url, "Dynamic ComfyUI install"))
 
 
 
@@ -1235,12 +1253,12 @@ def cmd_replace_project(ctx: RuntimeContext) -> None:
 
     manifest_path, source_url = prompt_and_prepare_project_manifest(network_volume)
     _save_selected_project(network_volume, manifest_path, source_url)
-    run_comfyui_install_flow(ctx, manifest_path)
+    run_comfyui_install_flow(ctx, manifest_path, ui_title=_install_ui_title(source_url, "Dynamic ComfyUI install"))
 
     if snapshot and snapshot.is_file() and previous_source and previous_source != source_url:
         comfyui_dir, custom_nodes_dir = ensure_comfyui_workspace(network_volume)
         _cleanup_previous_resources(snapshot, custom_nodes_dir, comfyui_dir)
-        run_comfyui_install_flow(ctx, manifest_path)
+        run_comfyui_install_flow(ctx, manifest_path, ui_title=_install_ui_title(source_url, "Dynamic ComfyUI install"))
 
 
 def cmd_update_nodes_and_models(ctx: RuntimeContext) -> None:
@@ -1267,7 +1285,7 @@ def cmd_update_nodes_and_models(ctx: RuntimeContext) -> None:
 
     save_project_state(network_volume, key, source_url)
     ctx.network_volume = network_volume
-    run_comfyui_install_flow(ctx, manifest_path)
+    run_comfyui_install_flow(ctx, manifest_path, ui_title=_install_ui_title(source_url, "Dynamic ComfyUI install"))
 
 
 def cmd_restart(ctx: RuntimeContext) -> None:
