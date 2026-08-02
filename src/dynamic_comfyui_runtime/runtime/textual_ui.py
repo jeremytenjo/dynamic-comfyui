@@ -62,6 +62,36 @@ def _aggregate_progress_label(progress_by_target: dict[str, tuple[int, int | Non
     return label
 
 
+def _register_tenjo_theme(app: object) -> None:
+    from textual.theme import Theme
+
+    tenjo_theme = Theme(
+        name="tenjo",
+        primary="#6750A4",
+        secondary="#625B71",
+        accent="#7D5260",
+        foreground="#1C1B1F",
+        background="#FFFBFE",
+        surface="#FFFBFE",
+        panel="#F7F2FA",
+        success="#2E7D32",
+        warning="#ED6C02",
+        error="#B3261E",
+        dark=False,
+        variables={
+            "block-cursor-background": "#6750A4",
+            "block-cursor-foreground": "#FFFFFF",
+            "footer-key-foreground": "#6750A4",
+            "input-selection-background": "#6750A4 35%",
+            "link-color": "#6750A4",
+            "scrollbar-color": "#CAC4D0",
+            "scrollbar-color-hover": "#6750A4",
+        },
+    )
+    app.register_theme(tenjo_theme)  # type: ignore[attr-defined]
+    app.theme = "tenjo"  # type: ignore[attr-defined]
+
+
 @dataclass
 class _WorkerResult:
     value: object | None = None
@@ -129,7 +159,6 @@ def run_install_tui(title: str, worker: Callable[[InstallEventSink], T]) -> T:
 
     class _InstallApp(App[_WorkerResult]):
         AUTO_FOCUS = ""
-        theme = "textual-light"
         CSS = """
         Screen {
             layout: vertical;
@@ -232,6 +261,7 @@ def run_install_tui(title: str, worker: Callable[[InstallEventSink], T]) -> T:
             yield Footer()
 
         def on_mount(self) -> None:
+            _register_tenjo_theme(self)
             downloads = self.query_one("#downloads", DataTable)
             downloads.add_column("File", key="target")
             downloads.add_column("Status", key="status")
@@ -378,7 +408,6 @@ def run_monitor_tui(progress_file: Path = PROGRESS_FILE) -> None:
 
     class _MonitorApp(App[None]):
         AUTO_FOCUS = ""
-        theme = "textual-light"
         CSS = """
         Screen {
             layout: vertical;
@@ -406,6 +435,7 @@ def run_monitor_tui(progress_file: Path = PROGRESS_FILE) -> None:
             yield Footer()
 
         def on_mount(self) -> None:
+            _register_tenjo_theme(self)
             table = self.query_one("#items", DataTable)
             table.add_column("Source")
             table.add_column("Kind")
