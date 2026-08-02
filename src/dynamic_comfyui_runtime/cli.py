@@ -27,6 +27,7 @@ from .runtime.operations import (
     cmd_update_dc,
     cmd_update_nodes_and_models,
 )
+from .runtime.textual_ui import cmd_monitor
 from .runtime.updater import REEXEC_FLAG, upgrade_runtime_package_and_reexec_install
 
 
@@ -44,6 +45,8 @@ COMMANDS: tuple[str, ...] = (
     "uninstall-dc",
     "system-info",
     "download",
+    "monitor",
+    "status",
     "deps-ls",
     "project-ls",
     "projects-ls",
@@ -162,6 +165,9 @@ def _help_text() -> str:
   Download a direct file URL into the current directory with progress.
   Usage: dc download <file_url>
 
+- dc monitor / dc status
+  Open an interactive terminal monitor for setup/install progress.
+
 - dc help
   Show this help menu.
 
@@ -205,7 +211,7 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.command == "help":
-        print(_help_text())
+        print_info(_help_text())
         raise SystemExit(0)
 
     if args.command == "install":
@@ -231,6 +237,8 @@ def main() -> None:
         "update-dc": cmd_update_dc,
         "uninstall-dc": cmd_uninstall_dc,
         "system-info": cmd_system_info,
+        "monitor": lambda _ctx: cmd_monitor(),
+        "status": lambda _ctx: cmd_monitor(),
         "deps-ls": cmd_deps_ls,
         "project-ls": cmd_deps_ls,
         "projects-ls": cmd_deps_ls,

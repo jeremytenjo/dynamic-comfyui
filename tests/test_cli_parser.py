@@ -40,6 +40,16 @@ class CliParserTests(unittest.TestCase):
         self.assertEqual(args.command, "download")
         self.assertEqual(args.url, url)
 
+    def test_monitor(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["monitor"])
+        self.assertEqual(args.command, "monitor")
+
+    def test_status_alias(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["status"])
+        self.assertEqual(args.command, "status")
+
     def test_project_ls_alias(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["project-ls"])

@@ -9,6 +9,7 @@ from rich.table import Table
 
 from .banner import print_project_banner
 from .common import ensure_dir, format_size_for_display, now_epoch, probe_remote_file_size, require_tools, utc_timestamp
+from .install_events import InstallEventSink
 from .default_manifest_url import (
     clear_default_manifest_url_override,
     read_default_manifest_url_override,
@@ -64,6 +65,7 @@ from .service import (
 )
 from .start_deferred_downloads import split_start_deferred_files, start_background_deferred_file_downloads
 from .system_info import collect_system_info, print_system_info
+from .textual_ui import run_install_tui, should_use_textual
 from .ui import (
     console,
     print_error,
@@ -250,12 +252,19 @@ def _print_failures(node_failures: list[NodeInstallFailure], file_failures: list
             print_error(f" - {failure.target} ({failure.error})")
 
 
+def _prompt_secret(message: str, event_sink: InstallEventSink | None = None) -> str:
+    if event_sink is not None:
+        return event_sink.prompt_secret(message).strip()
+    return prompt_text(message, password=True).strip()
+
+
 def _retry_hf_401_file_downloads(
     merged: MergedManifest,
     comfyui_dir: Path,
     file_failures: list[FileInstallFailure],
     *,
     on_progress: callable | None = None,
+    event_sink: InstallEventSink | None = None,
 ) -> list[FileInstallFailure]:
     if not file_failures:
         return file_failures
@@ -281,7 +290,7 @@ def _retry_hf_401_file_downloads(
         title="Hugging Face Token Required",
         style="warning",
     )
-    retry_token = prompt_text("Enter your Hugging Face token").strip()
+    retry_token = _prompt_secret("Enter your Hugging Face token", event_sink)
     if not retry_token:
         print_warning("No Hugging Face token provided. Keeping original 401 failures.")
         return file_failures
@@ -307,6 +316,7 @@ def _retry_hf_401_file_downloads(
         comfyui_dir,
         hf_token=retry_token,
         on_progress=on_progress,
+        event_sink=event_sink,
     )
 
     retried_targets = {Path(spec.target).as_posix() for spec in retry_specs}
@@ -332,6 +342,7 @@ def _ensure_hf_token_for_pending_downloads(
     merged: MergedManifest,
     comfyui_dir: Path,
     hf_token: str | None,
+    event_sink: InstallEventSink | None = None,
 ) -> str | None:
     if hf_token:
         return hf_token
@@ -358,7 +369,7 @@ def _ensure_hf_token_for_pending_downloads(
         title="Hugging Face Token Required",
         style="warning",
     )
-    token = prompt_text("Enter your Hugging Face token").strip()
+    token = _prompt_secret("Enter your Hugging Face token", event_sink)
     if not token:
         raise RuntimeError("Hugging Face token is required for one or more pending model downloads")
     return token
@@ -368,6 +379,7 @@ def _ensure_hf_token_for_manifest_batch(
     merged_manifests: list[MergedManifest],
     comfyui_dir: Path,
     hf_token: str | None,
+    event_sink: InstallEventSink | None = None,
 ) -> str | None:
     if hf_token:
         return hf_token
@@ -399,7 +411,7 @@ def _ensure_hf_token_for_manifest_batch(
         title="Hugging Face Token Required",
         style="warning",
     )
-    token = prompt_text("Enter your Hugging Face token").strip()
+    token = _prompt_secret("Enter your Hugging Face token", event_sink)
     if not token:
         raise RuntimeError("Hugging Face token is required for one or more pending model downloads")
     return token
@@ -571,6 +583,7 @@ def _execute_dependency_install(
     default_manifest_path: Path | None = None,
     hf_token: str | None = None,
     defer_start_files: bool = False,
+    event_sink: InstallEventSink | None = None,
 ) -> InstallExecution:
     print_rule("Dependency Install")
     network_volume = set_network_volume_default(ctx.network_volume)
@@ -587,7 +600,7 @@ def _execute_dependency_install(
         )
     if not hf_token:
         hf_token = loaded_hf_token
-    hf_token = _ensure_hf_token_for_pending_downloads(merged, comfyui_dir, hf_token)
+    hf_token = _ensure_hf_token_for_pending_downloads(merged, comfyui_dir, hf_token, event_sink)
     install_merged, deferred_files = split_start_deferred_files(merged) if defer_start_files else (merged, [])
     if deferred_files:
         print_info(
@@ -613,6 +626,7 @@ def _execute_dependency_install(
         install_merged.merged_custom_nodes,
         custom_nodes_dir,
         on_progress=lambda: mark_running(install_merged, comfyui_dir),
+        event_sink=event_sink,
     )
 
     print_rule("Files")
@@ -621,12 +635,14 @@ def _execute_dependency_install(
         comfyui_dir,
         hf_token=hf_token,
         on_progress=lambda: mark_running(install_merged, comfyui_dir),
+        event_sink=event_sink,
     )
     file_failures = _retry_hf_401_file_downloads(
         install_merged,
         comfyui_dir,
         file_failures,
         on_progress=lambda: mark_running(install_merged, comfyui_dir),
+        event_sink=event_sink,
     )
 
     return InstallExecution(
@@ -641,10 +657,15 @@ def _execute_dependency_install(
     )
 
 
-def run_comfyui_install_flow(ctx: RuntimeContext, project_manifest_path: Path) -> None:
+def _run_comfyui_install_flow_plain(
+    ctx: RuntimeContext,
+    project_manifest_path: Path,
+    *,
+    event_sink: InstallEventSink | None = None,
+) -> None:
     ctx.install_start_ts = now_epoch()
     clear_install_sentinel(set_network_volume_default(ctx.network_volume))
-    execution = _execute_dependency_install(ctx, project_manifest_path, manager_quiet=False)
+    execution = _execute_dependency_install(ctx, project_manifest_path, manager_quiet=False, event_sink=event_sink)
 
     write_install_sentinel(execution.network_volume, execution.comfyui_dir)
     startup_lines = start_comfyui_service(
@@ -663,11 +684,22 @@ def run_comfyui_install_flow(ctx: RuntimeContext, project_manifest_path: Path) -
         print_info(line)
 
 
-def run_comfyui_install_flow_foreground(
+def run_comfyui_install_flow(ctx: RuntimeContext, project_manifest_path: Path) -> None:
+    if should_use_textual():
+        run_install_tui(
+            "Dynamic ComfyUI install",
+            lambda event_sink: _run_comfyui_install_flow_plain(ctx, project_manifest_path, event_sink=event_sink),
+        )
+        return
+    _run_comfyui_install_flow_plain(ctx, project_manifest_path)
+
+
+def _run_comfyui_install_flow_foreground_plain(
     ctx: RuntimeContext,
     project_manifest_path: Path,
     *,
     defer_start_files: bool = False,
+    event_sink: InstallEventSink | None = None,
 ) -> None:
     ctx.install_start_ts = now_epoch()
     clear_install_sentinel(set_network_volume_default(ctx.network_volume))
@@ -676,6 +708,7 @@ def run_comfyui_install_flow_foreground(
         project_manifest_path,
         manager_quiet=False,
         defer_start_files=defer_start_files,
+        event_sink=event_sink,
     )
 
     write_install_sentinel(execution.network_volume, execution.comfyui_dir)
@@ -703,6 +736,26 @@ def run_comfyui_install_flow_foreground(
     )
 
 
+def run_comfyui_install_flow_foreground(
+    ctx: RuntimeContext,
+    project_manifest_path: Path,
+    *,
+    defer_start_files: bool = False,
+) -> None:
+    if should_use_textual():
+        run_install_tui(
+            "Dynamic ComfyUI start",
+            lambda event_sink: _run_comfyui_install_flow_foreground_plain(
+                ctx,
+                project_manifest_path,
+                defer_start_files=defer_start_files,
+                event_sink=event_sink,
+            ),
+        )
+        return
+    _run_comfyui_install_flow_foreground_plain(ctx, project_manifest_path, defer_start_files=defer_start_files)
+
+
 def _dependency_completion_message(ctx: RuntimeContext) -> str:
     if ctx.install_start_ts is None:
         return "Dependency installation complete."
@@ -719,7 +772,7 @@ def _format_elapsed_duration(elapsed_seconds: int) -> str:
     return f"{elapsed_minutes} {minute_label}"
 
 
-def run_dependency_install_flow(
+def _run_dependency_install_flow_plain(
     ctx: RuntimeContext,
     project_manifest_path: Path,
     *,
@@ -728,6 +781,7 @@ def run_dependency_install_flow(
     show_completion: bool = True,
     show_comfyui_link: bool = True,
     defer_start_files: bool = False,
+    event_sink: InstallEventSink | None = None,
 ) -> InstallExecution:
     ctx.install_start_ts = now_epoch()
     execution = _execute_dependency_install(
@@ -737,6 +791,7 @@ def run_dependency_install_flow(
         default_manifest_path=default_manifest_path,
         hf_token=hf_token,
         defer_start_files=defer_start_files,
+        event_sink=event_sink,
     )
 
     mark_done(execution.merged, execution.comfyui_dir)
@@ -752,6 +807,41 @@ def run_dependency_install_flow(
     if show_comfyui_link:
         _print_comfyui_link()
     return execution
+
+
+def run_dependency_install_flow(
+    ctx: RuntimeContext,
+    project_manifest_path: Path,
+    *,
+    default_manifest_path: Path | None = None,
+    hf_token: str | None = None,
+    show_completion: bool = True,
+    show_comfyui_link: bool = True,
+    defer_start_files: bool = False,
+) -> InstallExecution:
+    if should_use_textual():
+        return run_install_tui(
+            "Dynamic ComfyUI dependency install",
+            lambda event_sink: _run_dependency_install_flow_plain(
+                ctx,
+                project_manifest_path,
+                default_manifest_path=default_manifest_path,
+                hf_token=hf_token,
+                show_completion=show_completion,
+                show_comfyui_link=show_comfyui_link,
+                defer_start_files=defer_start_files,
+                event_sink=event_sink,
+            ),
+        )
+    return _run_dependency_install_flow_plain(
+        ctx,
+        project_manifest_path,
+        default_manifest_path=default_manifest_path,
+        hf_token=hf_token,
+        show_completion=show_completion,
+        show_comfyui_link=show_comfyui_link,
+        defer_start_files=defer_start_files,
+    )
 
 
 def cmd_install(ctx: RuntimeContext) -> None:

@@ -10,6 +10,7 @@ from threading import Lock
 from rich.table import Table
 
 from .common import download_file, effective_free_bytes, format_size_for_display, probe_remote_file_size, run
+from .install_events import InstallEvent, InstallEventSink
 from .manifests import CustomNode, FileSpec
 from .ui import console, print_error, print_info, print_success, print_warning
 
@@ -38,11 +39,25 @@ def _format_duration(seconds: float) -> str:
     return f"{hours}h {minutes}m {seconds}s"
 
 
+def _emit_or_print(event_sink: InstallEventSink | None, event: InstallEvent, printer: callable | None = None) -> None:
+    if event_sink is not None:
+        event_sink.emit(event)
+        return
+    (printer or print_info)(event.message)
+
+
 def install_custom_nodes(
-    custom_nodes: list[CustomNode], custom_nodes_dir: Path, *, on_progress: callable | None = None
+    custom_nodes: list[CustomNode],
+    custom_nodes_dir: Path,
+    *,
+    on_progress: callable | None = None,
+    event_sink: InstallEventSink | None = None,
 ) -> list[NodeInstallFailure]:
     if not custom_nodes:
-        print_info("No custom nodes defined in install manifest; skipping node installation.")
+        _emit_or_print(
+            event_sink,
+            InstallEvent(kind="info", message="No custom nodes defined in install manifest; skipping node installation."),
+        )
         return []
 
     failures: list[NodeInstallFailure] = []
@@ -54,9 +69,18 @@ def install_custom_nodes(
         if node_path.is_dir():
             completed_nodes += 1
             remaining_nodes = total_nodes - completed_nodes
-            print_success(
-                f"{node_prefix} {node.repo_dir}: already installed "
-                f"({completed_nodes}/{total_nodes} complete, remaining {remaining_nodes})"
+            _emit_or_print(
+                event_sink,
+                InstallEvent(
+                    kind="node",
+                    status="ready",
+                    target=f"custom_nodes/{node.repo_dir}",
+                    message=(
+                        f"{node_prefix} {node.repo_dir}: already installed "
+                        f"({completed_nodes}/{total_nodes} complete, remaining {remaining_nodes})"
+                    ),
+                ),
+                print_success,
             )
             if on_progress:
                 on_progress()
@@ -65,15 +89,31 @@ def install_custom_nodes(
         if node_path.exists():
             shutil.rmtree(node_path)
         try:
-            print_info(f"{node_prefix} {node.repo_dir}: clone started")
+            _emit_or_print(
+                event_sink,
+                InstallEvent(kind="node", status="cloning", target=f"custom_nodes/{node.repo_dir}", message=f"{node_prefix} {node.repo_dir}: clone started"),
+            )
             run(["git", "clone", node.repo, str(node_path)], quiet=True)
-            print_info(f"{node_prefix} {node.repo_dir}: clone complete")
+            _emit_or_print(
+                event_sink,
+                InstallEvent(kind="node", status="cloned", target=f"custom_nodes/{node.repo_dir}", message=f"{node_prefix} {node.repo_dir}: clone complete"),
+            )
         except Exception as exc:
             failures.append(NodeInstallFailure(repo_dir=node.repo_dir, step="git clone", error=str(exc)))
             completed_nodes += 1
             remaining_nodes = total_nodes - completed_nodes
-            print_error(f"{node_prefix} {node.repo_dir}: clone failed ({exc})")
-            print_info(f"Custom nodes progress: {completed_nodes}/{total_nodes} complete (remaining {remaining_nodes})")
+            _emit_or_print(
+                event_sink,
+                InstallEvent(
+                    kind="error",
+                    status="error",
+                    target=f"custom_nodes/{node.repo_dir}",
+                    message=f"{node_prefix} {node.repo_dir}: clone failed ({exc})",
+                    error=str(exc),
+                ),
+                print_error,
+            )
+            _emit_or_print(event_sink, InstallEvent(kind="node", message=f"Custom nodes progress: {completed_nodes}/{total_nodes} complete (remaining {remaining_nodes})"))
             if on_progress:
                 on_progress()
             continue
@@ -81,44 +121,53 @@ def install_custom_nodes(
         requirements = node_path / "requirements.txt"
         if requirements.is_file():
             try:
-                print_info(f"{node_prefix} {node.repo_dir}: requirements install started")
+                _emit_or_print(event_sink, InstallEvent(kind="node", status="requirements", target=f"custom_nodes/{node.repo_dir}", message=f"{node_prefix} {node.repo_dir}: requirements install started"))
                 run(["python3", "-m", "pip", "install", "--no-cache-dir", "-r", str(requirements)], quiet=True)
-                print_info(f"{node_prefix} {node.repo_dir}: requirements install complete")
+                _emit_or_print(event_sink, InstallEvent(kind="node", status="requirements done", target=f"custom_nodes/{node.repo_dir}", message=f"{node_prefix} {node.repo_dir}: requirements install complete"))
             except Exception as exc:
                 failures.append(NodeInstallFailure(repo_dir=node.repo_dir, step="requirements install", error=str(exc)))
                 completed_nodes += 1
                 remaining_nodes = total_nodes - completed_nodes
-                print_error(f"{node_prefix} {node.repo_dir}: requirements install failed ({exc})")
-                print_info(f"Custom nodes progress: {completed_nodes}/{total_nodes} complete (remaining {remaining_nodes})")
+                _emit_or_print(event_sink, InstallEvent(kind="error", status="error", target=f"custom_nodes/{node.repo_dir}", message=f"{node_prefix} {node.repo_dir}: requirements install failed ({exc})", error=str(exc)), print_error)
+                _emit_or_print(event_sink, InstallEvent(kind="node", message=f"Custom nodes progress: {completed_nodes}/{total_nodes} complete (remaining {remaining_nodes})"))
                 if on_progress:
                     on_progress()
                 continue
         else:
-            print_info(f"{node_prefix} {node.repo_dir}: requirements skipped")
+            _emit_or_print(event_sink, InstallEvent(kind="node", status="requirements skipped", target=f"custom_nodes/{node.repo_dir}", message=f"{node_prefix} {node.repo_dir}: requirements skipped"))
 
         install_py = node_path / "install.py"
         if install_py.is_file():
             try:
-                print_info(f"{node_prefix} {node.repo_dir}: install.py started")
+                _emit_or_print(event_sink, InstallEvent(kind="node", status="install.py", target=f"custom_nodes/{node.repo_dir}", message=f"{node_prefix} {node.repo_dir}: install.py started"))
                 run(["python3", "install.py"], cwd=node_path, quiet=True)
-                print_info(f"{node_prefix} {node.repo_dir}: install.py complete")
+                _emit_or_print(event_sink, InstallEvent(kind="node", status="install.py done", target=f"custom_nodes/{node.repo_dir}", message=f"{node_prefix} {node.repo_dir}: install.py complete"))
             except Exception as exc:
                 failures.append(NodeInstallFailure(repo_dir=node.repo_dir, step="install.py", error=str(exc)))
                 completed_nodes += 1
                 remaining_nodes = total_nodes - completed_nodes
-                print_error(f"{node_prefix} {node.repo_dir}: install.py failed ({exc})")
-                print_info(f"Custom nodes progress: {completed_nodes}/{total_nodes} complete (remaining {remaining_nodes})")
+                _emit_or_print(event_sink, InstallEvent(kind="error", status="error", target=f"custom_nodes/{node.repo_dir}", message=f"{node_prefix} {node.repo_dir}: install.py failed ({exc})", error=str(exc)), print_error)
+                _emit_or_print(event_sink, InstallEvent(kind="node", message=f"Custom nodes progress: {completed_nodes}/{total_nodes} complete (remaining {remaining_nodes})"))
                 if on_progress:
                     on_progress()
                 continue
         else:
-            print_info(f"{node_prefix} {node.repo_dir}: install.py skipped")
+            _emit_or_print(event_sink, InstallEvent(kind="node", status="install.py skipped", target=f"custom_nodes/{node.repo_dir}", message=f"{node_prefix} {node.repo_dir}: install.py skipped"))
 
         completed_nodes += 1
         remaining_nodes = total_nodes - completed_nodes
-        print_success(
-            f"{node_prefix} {node.repo_dir}: ready "
-            f"({completed_nodes}/{total_nodes} complete, remaining {remaining_nodes})"
+        _emit_or_print(
+            event_sink,
+            InstallEvent(
+                kind="node",
+                status="ready",
+                target=f"custom_nodes/{node.repo_dir}",
+                message=(
+                    f"{node_prefix} {node.repo_dir}: ready "
+                    f"({completed_nodes}/{total_nodes} complete, remaining {remaining_nodes})"
+                ),
+            ),
+            print_success,
         )
         if on_progress:
             on_progress()
@@ -131,9 +180,13 @@ def install_files(
     *,
     hf_token: str | None,
     on_progress: callable | None = None,
+    event_sink: InstallEventSink | None = None,
 ) -> list[FileInstallFailure]:
     if not files:
-        print_info("No files defined in install manifest; skipping file installation.")
+        _emit_or_print(
+            event_sink,
+            InstallEvent(kind="info", message="No files defined in install manifest; skipping file installation."),
+        )
         return []
 
     files_to_download: list[FileSpec] = []
@@ -148,7 +201,7 @@ def install_files(
             files_to_download.append(FileSpec(url=file_spec.url, target=normalized_target))
 
     if files_to_download:
-        print_info("Checking available storage for pending downloads...")
+        _emit_or_print(event_sink, InstallEvent(kind="phase", message="Checking available storage for pending downloads..."))
         required_known_bytes = 0
         known_sizes_by_target: dict[str, int] = {}
         unknown_size_targets: list[str] = []
@@ -161,7 +214,7 @@ def install_files(
             required_known_bytes += size
 
         free_bytes = effective_free_bytes(comfyui_dir)
-        print_info(f"Storage preflight: known required={format_size_for_display(required_known_bytes)}")
+        _emit_or_print(event_sink, InstallEvent(kind="info", message=f"Storage preflight: known required={format_size_for_display(required_known_bytes)}"))
         if required_known_bytes > free_bytes:
             raise RuntimeError(
                 "Insufficient storage for downloads. "
@@ -169,12 +222,19 @@ def install_files(
                 f"but only {format_size_for_display(free_bytes)} is available."
             )
         if unknown_size_targets:
-            print_warning(
-                "Warning: could not determine remote size for "
-                f"{len(unknown_size_targets)} file(s), so storage fit cannot be fully guaranteed."
+            _emit_or_print(
+                event_sink,
+                InstallEvent(
+                    kind="warning",
+                    message=(
+                        "Warning: could not determine remote size for "
+                        f"{len(unknown_size_targets)} file(s), so storage fit cannot be fully guaranteed."
+                    ),
+                ),
+                print_warning,
             )
             for target in unknown_size_targets:
-                print_warning(f" - {target}")
+                _emit_or_print(event_sink, InstallEvent(kind="warning", target=target, status="size unknown", message=f" - {target}"), print_warning)
     else:
         known_sizes_by_target = {}
 
@@ -198,21 +258,29 @@ def install_files(
                 for target in sorted(pending_targets)
             ]
 
-        print_info(f"Remaining downloads ({len(pending_snapshot)}):")
+        _emit_or_print(event_sink, InstallEvent(kind="info", message=f"Remaining downloads ({len(pending_snapshot)}):"))
         for target, (downloaded, total) in pending_snapshot:
             started = target in start_time_by_target
             if started and downloaded <= 0:
                 if total and total > 0:
-                    print_info(f" - {target}: in progress ({format_size_for_display(total)} total)")
+                    _emit_or_print(event_sink, InstallEvent(kind="download", target=target, status="in progress", downloaded=downloaded, total=total, message=f" - {target}: in progress ({format_size_for_display(total)} total)"))
                 else:
-                    print_info(f" - {target}: in progress (size unknown)")
+                    _emit_or_print(event_sink, InstallEvent(kind="download", target=target, status="in progress", downloaded=downloaded, total=total, message=f" - {target}: in progress (size unknown)"))
                 continue
             if total and total > 0:
-                print_info(
-                    f" - {target}: {format_size_for_display(downloaded)}/{format_size_for_display(total)}"
+                _emit_or_print(
+                    event_sink,
+                    InstallEvent(
+                        kind="download",
+                        target=target,
+                        status="in progress",
+                        downloaded=downloaded,
+                        total=total,
+                        message=f" - {target}: {format_size_for_display(downloaded)}/{format_size_for_display(total)}",
+                    ),
                 )
             else:
-                print_info(f" - {target}: {format_size_for_display(downloaded)} downloaded")
+                _emit_or_print(event_sink, InstallEvent(kind="download", target=target, status="in progress", downloaded=downloaded, total=total, message=f" - {target}: {format_size_for_display(downloaded)} downloaded"))
 
     def _print_next_download_estimate(pending_targets: set[str], bytes_per_second: float) -> None:
         if not pending_targets or bytes_per_second <= 0:
@@ -222,19 +290,29 @@ def install_files(
         with progress_lock:
             downloaded, total = progress_snapshots.get(next_target, (0, None))
         if not total or total <= 0:
-            print_info(f"Estimated next download duration for {next_target}: unavailable (size unknown)")
+            _emit_or_print(event_sink, InstallEvent(kind="download", target=next_target, status="queued", downloaded=downloaded, total=total, message=f"Estimated next download duration for {next_target}: unavailable (size unknown)"))
             return
 
         remaining_bytes = max(total - downloaded, 0)
         estimate_label = _format_duration(remaining_bytes / bytes_per_second)
         rate_label = f"{format_size_for_display(int(bytes_per_second))}/s"
         if downloaded > 0:
-            print_info(
-                f"Estimated next download duration for {next_target}: "
-                f"~{estimate_label} remaining at {rate_label}"
+            _emit_or_print(
+                event_sink,
+                InstallEvent(
+                    kind="download",
+                    target=next_target,
+                    status="queued",
+                    downloaded=downloaded,
+                    total=total,
+                    message=(
+                        f"Estimated next download duration for {next_target}: "
+                        f"~{estimate_label} remaining at {rate_label}"
+                    ),
+                ),
             )
         else:
-            print_info(f"Estimated next download duration for {next_target}: ~{estimate_label} at {rate_label}")
+            _emit_or_print(event_sink, InstallEvent(kind="download", target=next_target, status="queued", downloaded=downloaded, total=total, message=f"Estimated next download duration for {next_target}: ~{estimate_label} at {rate_label}"))
 
     def _process_file(file_spec: FileSpec) -> FileInstallFailure | None:
         nonlocal reserved_known_bytes
@@ -247,11 +325,19 @@ def install_files(
             start_time = time.monotonic()
             start_time_by_target[file_spec.target] = start_time
             if known_size is not None and known_size > 0:
-                print_info(
-                    f"[download] {file_spec.target}: started (0% 0/{format_size_for_display(known_size)})"
+                _emit_or_print(
+                    event_sink,
+                    InstallEvent(
+                        kind="download",
+                        target=file_spec.target,
+                        status="started",
+                        downloaded=0,
+                        total=known_size,
+                        message=f"[download] {file_spec.target}: started (0% 0/{format_size_for_display(known_size)})",
+                    ),
                 )
             else:
-                print_info(f"[download] {file_spec.target}: started (size unknown)")
+                _emit_or_print(event_sink, InstallEvent(kind="download", target=file_spec.target, status="started", downloaded=0, total=None, message=f"[download] {file_spec.target}: started (size unknown)"))
             last_log_time_by_target[file_spec.target] = time.monotonic()
 
             if known_size is not None and known_size > 0:
@@ -284,9 +370,19 @@ def install_files(
                     if total is None:
                         last_log_time = last_log_time_by_target.get(file_spec.target, now)
                         if downloaded > 0 and now - last_log_time >= effective_log_interval:
-                            print_info(
-                                f"[download] {file_spec.target}: progress "
-                                f"({format_size_for_display(downloaded)} downloaded)"
+                            _emit_or_print(
+                                event_sink,
+                                InstallEvent(
+                                    kind="download",
+                                    target=file_spec.target,
+                                    status="downloading",
+                                    downloaded=downloaded,
+                                    total=total,
+                                    message=(
+                                        f"[download] {file_spec.target}: progress "
+                                        f"({format_size_for_display(downloaded)} downloaded)"
+                                    ),
+                                ),
                             )
                             last_log_time_by_target[file_spec.target] = now
                         return
@@ -298,9 +394,19 @@ def install_files(
                     next_checkpoint = last_checkpoint + effective_checkpoint_step
                     emitted_checkpoint = False
                     while next_checkpoint <= max_checkpoint and percent >= next_checkpoint:
-                        print_info(
-                            f"[download] {file_spec.target}: {next_checkpoint}% "
-                            f"({format_size_for_display(downloaded)}/{format_size_for_display(total)})"
+                        _emit_or_print(
+                            event_sink,
+                            InstallEvent(
+                                kind="download",
+                                target=file_spec.target,
+                                status="downloading",
+                                downloaded=downloaded,
+                                total=total,
+                                message=(
+                                    f"[download] {file_spec.target}: {next_checkpoint}% "
+                                    f"({format_size_for_display(downloaded)}/{format_size_for_display(total)})"
+                                ),
+                            ),
                         )
                         emitted_checkpoint = True
                         last_checkpoint = next_checkpoint
@@ -312,9 +418,19 @@ def install_files(
 
                     last_log_time = last_log_time_by_target.get(file_spec.target, now)
                     if downloaded > 0 and now - last_log_time >= effective_log_interval:
-                        print_info(
-                            f"[download] {file_spec.target}: {percent}% "
-                            f"({format_size_for_display(downloaded)}/{format_size_for_display(total)})"
+                        _emit_or_print(
+                            event_sink,
+                            InstallEvent(
+                                kind="download",
+                                target=file_spec.target,
+                                status="downloading",
+                                downloaded=downloaded,
+                                total=total,
+                                message=(
+                                    f"[download] {file_spec.target}: {percent}% "
+                                    f"({format_size_for_display(downloaded)}/{format_size_for_display(total)})"
+                                ),
+                            ),
                         )
                         last_log_time_by_target[file_spec.target] = now
 
@@ -359,8 +475,12 @@ def install_files(
             failure = future.result()
             if failure is not None:
                 failures.append(failure)
-                print_error(f"Failed to download {file_spec.target}: {failure.error}")
-                print_info(f"Download progress: {remaining_label}")
+                _emit_or_print(
+                    event_sink,
+                    InstallEvent(kind="error", target=file_spec.target, status="error", message=f"Failed to download {file_spec.target}: {failure.error}", error=failure.error),
+                    print_error,
+                )
+                _emit_or_print(event_sink, InstallEvent(kind="download", message=f"Download progress: {remaining_label}"))
             else:
                 completed, total = progress_snapshots.get(file_spec.target, (0, None))
                 start_time = start_time_by_target.get(file_spec.target)
@@ -370,19 +490,52 @@ def install_files(
                 if total and total > 0:
                     percent = int((completed * 100) / total) if total > 0 else 0
                     if completed < total:
-                        print_warning(
-                            f"[download] {file_spec.target}: Warning: incomplete download "
-                            f"({format_size_for_display(completed)}/{format_size_for_display(total)})"
+                        _emit_or_print(
+                            event_sink,
+                            InstallEvent(
+                                kind="warning",
+                                target=file_spec.target,
+                                status="incomplete",
+                                downloaded=completed,
+                                total=total,
+                                message=(
+                                    f"[download] {file_spec.target}: Warning: incomplete download "
+                                    f"({format_size_for_display(completed)}/{format_size_for_display(total)})"
+                                ),
+                            ),
+                            print_warning,
                         )
-                    print_success(
-                        f"[download] {file_spec.target}: {percent}% "
-                        f"({format_size_for_display(completed)}/{format_size_for_display(total)}) completed "
-                        f"in {duration_label} {remaining_label}"
+                    _emit_or_print(
+                        event_sink,
+                        InstallEvent(
+                            kind="download",
+                            target=file_spec.target,
+                            status="complete",
+                            downloaded=completed,
+                            total=total,
+                            message=(
+                                f"[download] {file_spec.target}: {percent}% "
+                                f"({format_size_for_display(completed)}/{format_size_for_display(total)}) completed "
+                                f"in {duration_label} {remaining_label}"
+                            ),
+                        ),
+                        print_success,
                     )
                 else:
-                    print_success(
-                        f"[download] {file_spec.target}: completed "
-                        f"({format_size_for_display(completed)}) in {duration_label} {remaining_label}"
+                    _emit_or_print(
+                        event_sink,
+                        InstallEvent(
+                            kind="download",
+                            target=file_spec.target,
+                            status="complete",
+                            downloaded=completed,
+                            total=total,
+                            message=(
+                                f"[download] {file_spec.target}: completed "
+                                f"({format_size_for_display(completed)}) in {duration_label} {remaining_label}"
+                            ),
+                        ),
+                        print_success,
                     )
             if remaining_downloads > 0:
                 if failure is None and download_rate and download_rate > 0:
@@ -432,13 +585,13 @@ def remove_project_resources(node_dirs: list[str], file_targets: list[str], cust
 
 
 def print_custom_nodes_summary(title: str, specs: list[CustomNode], custom_nodes_dir: Path) -> None:
-    print(title)
+    print_info(title)
     if not specs:
-        print(" - (none)")
+        print_info(" - (none)")
         return
     for node in specs:
         suffix = "" if (custom_nodes_dir / node.repo_dir).is_dir() else " (missing on disk)"
-        print(f" - {node.repo_dir}{suffix}")
+        print_info(f" - {node.repo_dir}{suffix}")
 
 
 def _group_key(target: str) -> str:
@@ -452,9 +605,9 @@ def _group_key(target: str) -> str:
 
 
 def print_files_summary(title: str, specs: list[FileSpec], comfyui_dir: Path) -> None:
-    print(title)
+    print_info(title)
     if not specs:
-        print(" - (none)")
+        print_info(" - (none)")
         return
 
     groups: dict[str, list[tuple[str, bool]]] = {}
@@ -463,7 +616,7 @@ def print_files_summary(title: str, specs: list[FileSpec], comfyui_dir: Path) ->
         groups.setdefault(key, []).append((spec.target, (comfyui_dir / spec.target).is_file()))
 
     for key in sorted(groups):
-        print(f" - {key}")
+        print_info(f" - {key}")
         for target, exists in groups[key]:
             suffix = "" if exists else " (missing on disk)"
-            print(f"   - {target}{suffix}")
+            print_info(f"   - {target}{suffix}")
