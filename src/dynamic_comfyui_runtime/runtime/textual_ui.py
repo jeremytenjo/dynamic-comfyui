@@ -176,6 +176,21 @@ def run_install_tui(title: str, worker: Callable[[InstallEventSink], T]) -> T:
             padding: 0 1 1 1;
         }
 
+        #install-title-row {
+            height: 1;
+        }
+
+        #install-title-spacer {
+            width: 1fr;
+        }
+
+        #install-timer {
+            width: 18;
+            text-style: bold;
+            text-align: right;
+            color: $primary;
+        }
+
         .panel {
             border: solid $accent;
             padding: 1;
@@ -184,22 +199,6 @@ def run_install_tui(title: str, worker: Callable[[InstallEventSink], T]) -> T:
         .panel-title {
             height: 1;
             text-style: bold;
-        }
-
-        #files-title-row {
-            height: 1;
-        }
-
-        #files-title {
-            width: 1fr;
-            text-style: bold;
-        }
-
-        #files-timer {
-            width: 24;
-            text-style: bold;
-            text-align: right;
-            color: $primary;
         }
 
         #main-panels {
@@ -240,14 +239,15 @@ def run_install_tui(title: str, worker: Callable[[InstallEventSink], T]) -> T:
 
         def compose(self) -> ComposeResult:
             with Vertical(id="body"):
+                with Horizontal(id="install-title-row"):
+                    yield Static("", id="install-title-spacer")
+                    yield Static("00:00:00", id="install-timer")
                 with Vertical(id="main-panels"):
                     with Vertical(id="nodes-panel", classes="panel"):
                         yield Static("Custom Nodes", classes="panel-title")
                         yield DataTable(id="nodes")
                     with Vertical(id="files-panel", classes="panel"):
-                        with Horizontal(id="files-title-row"):
-                            yield Static("Files", id="files-title")
-                            yield Static("00:00:00", id="files-timer")
+                        yield Static("Files", classes="panel-title")
                         yield DataTable(id="downloads")
                 with Vertical(id="errors-panel", classes="panel"):
                     yield Static("Errors (0)", id="errors-title", classes="panel-title")
@@ -305,7 +305,7 @@ def run_install_tui(title: str, worker: Callable[[InstallEventSink], T]) -> T:
                     table.update_cell(row_key, "source", event.message)
 
         def _update_elapsed_timer(self) -> None:
-            self.query_one("#files-timer", Static).update(_elapsed_label(self._started_at))
+            self.query_one("#install-timer", Static).update(_elapsed_label(self._started_at))
 
         def _update_node(self, event: InstallEvent) -> None:
             if event.target is None:

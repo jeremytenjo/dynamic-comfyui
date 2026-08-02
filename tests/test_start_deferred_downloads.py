@@ -16,6 +16,8 @@ from dynamic_comfyui_runtime.runtime.operations import (
     run_comfyui_install_flow_foreground,
 )
 from dynamic_comfyui_runtime.runtime.start_deferred_downloads import split_start_deferred_files
+from dynamic_comfyui_runtime.runtime.install_events import InstallEvent
+from dynamic_comfyui_runtime.runtime.textual_ui import _elapsed_label, _node_detail, _node_display_name
 
 
 class CapturingConsole:
@@ -135,6 +137,22 @@ class StartDeferredDownloadsTests(unittest.TestCase):
             self.assertEqual(events_by_target["models/installed.bin"].status, "installed")
             self.assertEqual(events_by_target["models/installed.bin"].downloaded, 12)
             self.assertEqual(events_by_target["models/installed.bin"].total, 12)
+
+    def test_textual_install_display_helpers_keep_values_compact(self) -> None:
+        self.assertEqual(_node_display_name("custom_nodes/ComfyUI-Test"), "ComfyUI-Test")
+        self.assertEqual(
+            _node_detail(
+                InstallEvent(
+                    kind="node",
+                    target="custom_nodes/ComfyUI-Test",
+                    status="ready",
+                    message="[node 1/2] ComfyUI-Test: already installed (1/2 complete, remaining 1)",
+                )
+            ),
+            "already installed",
+        )
+        with patch("dynamic_comfyui_runtime.runtime.textual_ui.time.monotonic", return_value=3723):
+            self.assertEqual(_elapsed_label(0), "01:02:03")
 
     def test_foreground_start_launches_deferred_download_after_comfyui_starts(self) -> None:
         with tempfile.TemporaryDirectory() as td:
