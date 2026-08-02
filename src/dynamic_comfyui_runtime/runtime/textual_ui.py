@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import threading
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -45,6 +46,27 @@ def _progress_label(downloaded: int | None, total: int | None) -> str:
         percent = int((downloaded * 100) / total)
         return f"{percent}% {format_size_for_display(downloaded)}/{format_size_for_display(total)}"
     return f"{format_size_for_display(downloaded)} downloaded"
+
+
+def _elapsed_label(started_at: float) -> str:
+    elapsed = max(0, int(time.monotonic() - started_at))
+    hours, remainder = divmod(elapsed, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+
+
+def _node_display_name(target: str) -> str:
+    return target.removeprefix("custom_nodes/")
+
+
+def _node_detail(event: InstallEvent) -> str:
+    if event.kind == "node_plan":
+        return event.message
+    _prefix, separator, detail = event.message.partition(": ")
+    if separator:
+        detail = detail.split(" (", 1)[0]
+        return detail
+    return event.message
 
 
 def _register_tenjo_theme(app: object) -> None:
@@ -164,6 +186,22 @@ def run_install_tui(title: str, worker: Callable[[InstallEventSink], T]) -> T:
             text-style: bold;
         }
 
+        #files-title-row {
+            height: 1;
+        }
+
+        #files-title {
+            width: 1fr;
+            text-style: bold;
+        }
+
+        #files-timer {
+            width: 24;
+            text-style: bold;
+            text-align: right;
+            color: $primary;
+        }
+
         #main-panels {
             height: 1fr;
         }
@@ -197,6 +235,7 @@ def run_install_tui(title: str, worker: Callable[[InstallEventSink], T]) -> T:
             self._download_row_keys: dict[str, object] = {}
             self._node_row_keys: dict[str, object] = {}
             self._error_count = 0
+            self._started_at = time.monotonic()
             self._result = _WorkerResult()
 
         def compose(self) -> ComposeResult:
@@ -206,7 +245,9 @@ def run_install_tui(title: str, worker: Callable[[InstallEventSink], T]) -> T:
                         yield Static("Custom Nodes", classes="panel-title")
                         yield DataTable(id="nodes")
                     with Vertical(id="files-panel", classes="panel"):
-                        yield Static("Files", classes="panel-title")
+                        with Horizontal(id="files-title-row"):
+                            yield Static("Files", id="files-title")
+                            yield Static("00:00:00", id="files-timer")
                         yield DataTable(id="downloads")
                 with Vertical(id="errors-panel", classes="panel"):
                     yield Static("Errors (0)", id="errors-title", classes="panel-title")
@@ -216,17 +257,18 @@ def run_install_tui(title: str, worker: Callable[[InstallEventSink], T]) -> T:
         def on_mount(self) -> None:
             _register_tenjo_theme(self)
             downloads = self.query_one("#downloads", DataTable)
-            downloads.add_column("File", key="target")
-            downloads.add_column("Status", key="status")
-            downloads.add_column("Progress", key="progress")
+            downloads.add_column("File", key="target", width=70)
+            downloads.add_column("Status", key="status", width=14)
+            downloads.add_column("Progress", key="progress", width=26)
             downloads.add_column("Source", key="source")
             nodes = self.query_one("#nodes", DataTable)
-            nodes.add_column("Custom Node", key="target")
-            nodes.add_column("Status", key="status")
+            nodes.add_column("Custom Node", key="target", width=40)
+            nodes.add_column("Status", key="status", width=22)
             nodes.add_column("Source / Detail", key="detail")
             errors = self.query_one("#errors", DataTable)
             errors.add_column("Target", key="target")
             errors.add_column("Error", key="error")
+            self.set_interval(1, self._update_elapsed_timer)
             thread = threading.Thread(target=self._run_worker, name="dynamic-comfyui-textual-worker", daemon=True)
             thread.start()
 
@@ -262,17 +304,23 @@ def run_install_tui(title: str, worker: Callable[[InstallEventSink], T]) -> T:
                 if event.kind == "file_plan":
                     table.update_cell(row_key, "source", event.message)
 
+        def _update_elapsed_timer(self) -> None:
+            self.query_one("#files-timer", Static).update(_elapsed_label(self._started_at))
+
         def _update_node(self, event: InstallEvent) -> None:
             if event.target is None:
                 return
             table = self.query_one("#nodes", DataTable)
             status = event.status or event.kind
+            target = _node_display_name(event.target)
+            detail = _node_detail(event)
             if event.target not in self._node_row_keys:
-                self._node_row_keys[event.target] = table.add_row(event.target, status, event.message)
+                self._node_row_keys[event.target] = table.add_row(target, status, detail)
                 return
             row_key = self._node_row_keys[event.target]
+            table.update_cell(row_key, "target", target)
             table.update_cell(row_key, "status", status)
-            table.update_cell(row_key, "detail", event.message)
+            table.update_cell(row_key, "detail", detail)
 
         def _append_error(self, event: InstallEvent) -> None:
             table = self.query_one("#errors", DataTable)
