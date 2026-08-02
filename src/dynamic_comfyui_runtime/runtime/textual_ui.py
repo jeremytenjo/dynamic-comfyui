@@ -69,6 +69,11 @@ def _node_detail(event: InstallEvent) -> str:
     return event.message
 
 
+def _download_sort_key(row: tuple[str, str, str, int | None], target: str) -> tuple[bool, int, str]:
+    total = row[3]
+    return total is None, -(total or 0), target
+
+
 def _register_tenjo_theme(app: object) -> None:
     from textual.theme import Theme
 
@@ -233,6 +238,7 @@ def run_install_tui(title: str, worker: Callable[[InstallEventSink], T]) -> T:
         def __init__(self) -> None:
             super().__init__()
             self._download_row_keys: dict[str, object] = {}
+            self._download_rows: dict[str, tuple[str, str, str, int | None]] = {}
             self._node_row_keys: dict[str, object] = {}
             self._error_count = 0
             self._started_at = time.monotonic()
@@ -293,17 +299,35 @@ def run_install_tui(title: str, worker: Callable[[InstallEventSink], T]) -> T:
             self._update_download(event)
 
         def _update_download(self, event: InstallEvent) -> None:
-            table = self.query_one("#downloads", DataTable)
             status = event.status or event.kind
             progress = _progress_label(event.downloaded, event.total)
-            if event.target not in self._download_row_keys:
-                self._download_row_keys[event.target] = table.add_row(event.target, status, progress, event.message)
-            else:
-                row_key = self._download_row_keys[event.target]
-                table.update_cell(row_key, "status", status)
-                table.update_cell(row_key, "progress", progress)
-                if event.kind == "file_plan":
-                    table.update_cell(row_key, "source", event.message)
+            previous = self._download_rows.get(event.target)
+            source = event.message if event.kind == "file_plan" or previous is None else previous[2]
+            total = event.total if event.total is not None else (previous[3] if previous else None)
+            self._download_rows[event.target] = (status, progress, source, total)
+            self._render_download_rows()
+
+        def _render_download_rows(self) -> None:
+            table = self.query_one("#downloads", DataTable)
+            cursor_target = None
+            if table.cursor_row is not None:
+                sorted_targets = self._sorted_download_targets()
+                if 0 <= table.cursor_row < len(sorted_targets):
+                    cursor_target = sorted_targets[table.cursor_row]
+            table.clear()
+            self._download_row_keys.clear()
+            sorted_targets = self._sorted_download_targets()
+            for target in sorted_targets:
+                status, progress, source, _total = self._download_rows[target]
+                self._download_row_keys[target] = table.add_row(target, status, progress, source)
+            if cursor_target in sorted_targets:
+                table.move_cursor(row=sorted_targets.index(cursor_target))
+
+        def _sorted_download_targets(self) -> list[str]:
+            return sorted(
+                self._download_rows,
+                key=lambda target: _download_sort_key(self._download_rows[target], target),
+            )
 
         def _update_elapsed_timer(self) -> None:
             self.query_one("#install-timer", Static).update(_elapsed_label(self._started_at))
