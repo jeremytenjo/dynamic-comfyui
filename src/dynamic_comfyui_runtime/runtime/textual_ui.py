@@ -89,9 +89,9 @@ def _register_tenjo_theme(app: object) -> None:
         secondary="#625B71",
         accent="#7D5260",
         foreground="#1C1B1F",
-        background="#FFFBFE",
-        surface="#FFFBFE",
-        panel="#F7F2FA",
+        background="#FFFFFF",
+        surface="#FFFFFF",
+        panel="#F8FAFC",
         success="#2E7D32",
         warning="#ED6C02",
         error="#B3261E",
@@ -242,6 +242,10 @@ def run_install_tui(title: str, worker: Callable[[InstallEventSink], T]) -> T:
         }
 
         DataTable {
+            background: transparent;
+
+            & > .datatable--header,
+            & > .datatable--fixed-header,
             & > .datatable--cursor,
             & > .datatable--fixed-cursor,
             & > .datatable--header-cursor,
@@ -423,6 +427,10 @@ def run_monitor_tui(progress_file: Path = PROGRESS_FILE) -> None:
         }
 
         DataTable {
+            background: transparent;
+
+            & > .datatable--header,
+            & > .datatable--fixed-header,
             & > .datatable--cursor,
             & > .datatable--fixed-cursor,
             & > .datatable--header-cursor,
