@@ -125,7 +125,7 @@ def run_install_tui(title: str, worker: Callable[[InstallEventSink], T]) -> T:
             self._app.call_from_thread(self._app.handle_install_event, event)
 
         def prompt_secret(self, message: str) -> str:
-            return self._app.call_from_thread(self._app.prompt_secret, message)
+            return self._app.prompt_secret(message)
 
     class _InstallApp(App[_WorkerResult]):
         CSS = """
