@@ -69,6 +69,12 @@ def _node_detail(event: InstallEvent) -> str:
     return event.message
 
 
+def _download_status_label(status: str) -> str:
+    if status == "downloading":
+        return "in progress"
+    return status
+
+
 def _download_sort_key(row: tuple[str, str, str, int | None], target: str) -> tuple[bool, int, str]:
     total = row[3]
     return total is None, -(total or 0), target
@@ -331,7 +337,7 @@ def run_install_tui(title: str, worker: Callable[[InstallEventSink], T]) -> T:
             sorted_targets = self._sorted_download_targets()
             for target in sorted_targets:
                 status, progress, source, _total = self._download_rows[target]
-                self._download_row_keys[target] = table.add_row(target, status, progress, source)
+                self._download_row_keys[target] = table.add_row(target, _download_status_label(status), progress, source)
             if cursor_target in sorted_targets:
                 table.move_cursor(row=sorted_targets.index(cursor_target))
 

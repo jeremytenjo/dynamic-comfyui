@@ -19,6 +19,7 @@ from dynamic_comfyui_runtime.runtime.start_deferred_downloads import split_start
 from dynamic_comfyui_runtime.runtime.install_events import InstallEvent
 from dynamic_comfyui_runtime.runtime.textual_ui import (
     _download_sort_key,
+    _download_status_label,
     _elapsed_label,
     _node_detail,
     _node_display_name,
@@ -158,6 +159,8 @@ class StartDeferredDownloadsTests(unittest.TestCase):
         )
         with patch("dynamic_comfyui_runtime.runtime.textual_ui.time.monotonic", return_value=3723):
             self.assertEqual(_elapsed_label(0), "01:02:03")
+        self.assertEqual(_download_status_label("downloading"), "in progress")
+        self.assertEqual(_download_status_label("success"), "success")
 
     def test_textual_download_sort_key_orders_largest_known_files_first(self) -> None:
         rows = {
