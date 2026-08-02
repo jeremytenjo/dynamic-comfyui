@@ -365,6 +365,17 @@ def install_files(
                     effective_total = known_size if known_size and known_size > 0 else total_size
                     total = effective_total if effective_total and effective_total > 0 else None
                     progress_snapshots[file_spec.target] = (downloaded, total)
+                    if event_sink is not None:
+                        event_sink.emit(
+                            InstallEvent(
+                                kind="download",
+                                target=file_spec.target,
+                                status="in progress",
+                                downloaded=downloaded,
+                                total=total,
+                                message=f"[download] {file_spec.target}: progress",
+                            )
+                        )
                     is_highlighted = highlighted_remaining_target == file_spec.target
                     effective_log_interval = 5.0 if is_highlighted else log_interval_seconds
                     if total is None:
