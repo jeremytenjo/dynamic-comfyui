@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import os
 import threading
-import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -48,20 +47,6 @@ def _progress_label(downloaded: int | None, total: int | None) -> str:
     return f"{format_size_for_display(downloaded)} downloaded"
 
 
-def _aggregate_progress_label(progress_by_target: dict[str, tuple[int, int | None]]) -> str:
-    total = sum(total for _downloaded, total in progress_by_target.values() if total and total > 0)
-    downloaded = sum(min(downloaded, total) for downloaded, total in progress_by_target.values() if total and total > 0)
-    unknown_count = sum(1 for _downloaded, total in progress_by_target.values() if not total or total <= 0)
-    if total <= 0:
-        if unknown_count:
-            return f"{unknown_count} download(s), size unknown"
-        return "Waiting for known-size downloads..."
-    label = f"{format_size_for_display(downloaded)}/{format_size_for_display(total)}"
-    if unknown_count:
-        label = f"{label} + {unknown_count} unknown-size download(s)"
-    return label
-
-
 def _register_tenjo_theme(app: object) -> None:
     from textual.theme import Theme
 
@@ -104,7 +89,7 @@ def run_install_tui(title: str, worker: Callable[[InstallEventSink], T]) -> T:
     from textual.app import App, ComposeResult
     from textual.containers import Horizontal, Vertical
     from textual.screen import ModalScreen
-    from textual.widgets import Button, DataTable, Footer, Header, MaskedInput, ProgressBar, Sparkline, Static
+    from textual.widgets import Button, DataTable, Footer, MaskedInput, Static
 
     class _SecretPrompt(ModalScreen[str]):
         CSS = """
@@ -164,11 +149,6 @@ def run_install_tui(title: str, worker: Callable[[InstallEventSink], T]) -> T:
             layout: vertical;
         }
 
-        #summary {
-            height: 2;
-            padding: 0 1;
-        }
-
         #body {
             height: 1fr;
             padding: 0 1 1 1;
@@ -184,32 +164,16 @@ def run_install_tui(title: str, worker: Callable[[InstallEventSink], T]) -> T:
             text-style: bold;
         }
 
-        #progress-panel {
-            height: 7;
-        }
-
-        #progress-label {
-            height: 1;
-        }
-
-        #speed-label {
-            height: 1;
-        }
-
-        #speed {
-            height: 1;
-        }
-
-        #tables-row {
+        #main-panels {
             height: 1fr;
         }
 
         #files-panel {
-            width: 2fr;
+            height: 1fr;
         }
 
         #nodes-panel {
-            width: 1fr;
+            height: 12;
         }
 
         #errors-panel {
@@ -233,28 +197,17 @@ def run_install_tui(title: str, worker: Callable[[InstallEventSink], T]) -> T:
             self._download_row_keys: dict[str, object] = {}
             self._node_row_keys: dict[str, object] = {}
             self._error_count = 0
-            self._progress_by_target: dict[str, tuple[int, int | None]] = {}
-            self._last_download_by_target: dict[str, tuple[int, float]] = {}
-            self._speed_samples: list[float] = []
             self._result = _WorkerResult()
 
         def compose(self) -> ComposeResult:
-            yield Header(show_clock=True)
-            yield Static(title, id="summary")
             with Vertical(id="body"):
-                with Vertical(id="progress-panel", classes="panel"):
-                    yield Static("Download Progress", classes="panel-title")
-                    yield Static("Waiting for downloads...", id="progress-label")
-                    yield ProgressBar(id="progress", show_eta=False)
-                    yield Static("Download speed: waiting", id="speed-label")
-                    yield Sparkline([], id="speed")
-                with Horizontal(id="tables-row"):
-                    with Vertical(id="files-panel", classes="panel"):
-                        yield Static("Files", classes="panel-title")
-                        yield DataTable(id="downloads")
+                with Vertical(id="main-panels"):
                     with Vertical(id="nodes-panel", classes="panel"):
                         yield Static("Custom Nodes", classes="panel-title")
                         yield DataTable(id="nodes")
+                    with Vertical(id="files-panel", classes="panel"):
+                        yield Static("Files", classes="panel-title")
+                        yield DataTable(id="downloads")
                 with Vertical(id="errors-panel", classes="panel"):
                     yield Static("Errors (0)", id="errors-title", classes="panel-title")
                     yield DataTable(id="errors")
@@ -287,13 +240,9 @@ def run_install_tui(title: str, worker: Callable[[InstallEventSink], T]) -> T:
                 self.call_from_thread(self.exit, self._result)
 
         def handle_install_event(self, event: InstallEvent) -> None:
-            summary = self.query_one("#summary", Static)
-            if event.kind not in {"file_plan", "node_plan"}:
-                summary.update(event.message)
             if event.kind == "error":
                 self._append_error(event)
             if not event.target:
-                self._update_aggregate_progress()
                 return
             if event.kind in {"node", "node_plan"} or event.target.startswith("custom_nodes/"):
                 self._update_node(event)
@@ -304,10 +253,6 @@ def run_install_tui(title: str, worker: Callable[[InstallEventSink], T]) -> T:
             table = self.query_one("#downloads", DataTable)
             status = event.status or event.kind
             progress = _progress_label(event.downloaded, event.total)
-            if event.kind in {"download", "file_plan"} and event.downloaded is not None:
-                self._record_speed(event)
-                self._progress_by_target[event.target] = (event.downloaded, event.total)
-                self._update_aggregate_progress()
             if event.target not in self._download_row_keys:
                 self._download_row_keys[event.target] = table.add_row(event.target, status, progress, event.message)
             else:
@@ -334,42 +279,6 @@ def run_install_tui(title: str, worker: Callable[[InstallEventSink], T]) -> T:
             self._error_count += 1
             table.add_row(event.target or "-", event.error or event.message)
             self.query_one("#errors-title", Static).update(f"Errors ({self._error_count})")
-
-        def _record_speed(self, event: InstallEvent) -> None:
-            if event.target is None or event.downloaded is None:
-                return
-            now = time.monotonic()
-            previous = self._last_download_by_target.get(event.target)
-            self._last_download_by_target[event.target] = (event.downloaded, now)
-            if previous is None:
-                return
-            previous_downloaded, previous_time = previous
-            elapsed = now - previous_time
-            delta = event.downloaded - previous_downloaded
-            if elapsed <= 0 or delta <= 0:
-                return
-            bytes_per_second = delta / elapsed
-            self._speed_samples.append(bytes_per_second)
-            self._speed_samples = self._speed_samples[-40:]
-            self.query_one("#speed", Sparkline).data = self._speed_samples
-            self.query_one("#speed-label", Static).update(
-                f"Download speed: {format_size_for_display(int(bytes_per_second))}/s"
-            )
-
-        def _update_aggregate_progress(self) -> None:
-            label = self.query_one("#progress-label", Static)
-            progress_bar = self.query_one("#progress", ProgressBar)
-            known_total = sum(total for _downloaded, total in self._progress_by_target.values() if total and total > 0)
-            known_downloaded = sum(
-                min(downloaded, total)
-                for downloaded, total in self._progress_by_target.values()
-                if total and total > 0
-            )
-            label.update(_aggregate_progress_label(self._progress_by_target))
-            if known_total > 0:
-                progress_bar.update(total=known_total, progress=known_downloaded)
-            else:
-                progress_bar.update(total=None, progress=0)
 
         def prompt_secret(self, message: str) -> str:
             result: list[str] = []
