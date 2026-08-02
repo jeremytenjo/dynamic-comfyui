@@ -227,7 +227,31 @@ def _download_file_with_wget(
     cmd.append(url)
 
     try:
-        run(cmd)
+        proc = subprocess.Popen(  # noqa: S603
+            cmd,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        last_reported = -1
+        while proc.poll() is None:
+            if on_progress:
+                downloaded = target.stat().st_size if target.is_file() else 0
+                if downloaded != last_reported:
+                    on_progress(downloaded, total_size)
+                    last_reported = downloaded
+            time.sleep(0.5)
+        stdout, stderr = proc.communicate()
+        if proc.returncode != 0:
+            details: list[str] = []
+            stdout_tail = _normalize_process_output(stdout).strip()
+            stderr_tail = _normalize_process_output(stderr).strip()
+            if stdout_tail:
+                details.append(f"stdout: {stdout_tail[-600:]}")
+            if stderr_tail:
+                details.append(f"stderr: {stderr_tail[-600:]}")
+            suffix = f" ({'; '.join(details)})" if details else ""
+            raise RuntimeError(f"Command failed ({proc.returncode}): {' '.join(cmd)}{suffix}")
         if on_progress:
             downloaded = target.stat().st_size if target.is_file() else 0
             on_progress(downloaded, total_size)
