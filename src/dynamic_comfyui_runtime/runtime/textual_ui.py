@@ -234,6 +234,18 @@ def run_install_tui(title: str, worker: Callable[[InstallEventSink], T]) -> T:
         #errors {
             height: 1fr;
         }
+
+        DataTable {
+            & > .datatable--cursor,
+            & > .datatable--fixed-cursor,
+            & > .datatable--header-cursor,
+            & > .datatable--header-hover,
+            & > .datatable--hover {
+                background: transparent;
+                color: $foreground;
+                text-style: none;
+            }
+        }
         """
         def __init__(self) -> None:
             super().__init__()
@@ -252,13 +264,13 @@ def run_install_tui(title: str, worker: Callable[[InstallEventSink], T]) -> T:
                 with Vertical(id="main-panels"):
                     with Vertical(id="nodes-panel", classes="panel"):
                         yield Static("Custom Nodes", classes="panel-title")
-                        yield DataTable(id="nodes")
+                        yield DataTable(id="nodes", show_cursor=False, cursor_type="none")
                     with Vertical(id="files-panel", classes="panel"):
                         yield Static("Files", classes="panel-title")
-                        yield DataTable(id="downloads")
+                        yield DataTable(id="downloads", show_cursor=False, cursor_type="none")
                 with Vertical(id="errors-panel", classes="panel"):
                     yield Static("Errors (0)", id="errors-title", classes="panel-title")
-                    yield DataTable(id="errors")
+                    yield DataTable(id="errors", show_cursor=False, cursor_type="none")
             yield Footer()
 
         def on_mount(self) -> None:
@@ -403,6 +415,18 @@ def run_monitor_tui(progress_file: Path = PROGRESS_FILE) -> None:
         #monitor-tabs {
             height: 1fr;
         }
+
+        DataTable {
+            & > .datatable--cursor,
+            & > .datatable--fixed-cursor,
+            & > .datatable--header-cursor,
+            & > .datatable--header-hover,
+            & > .datatable--hover {
+                background: transparent;
+                color: $foreground;
+                text-style: none;
+            }
+        }
         """
         BINDINGS = [("q", "quit", "Quit"), ("r", "refresh", "Refresh")]
 
@@ -411,7 +435,7 @@ def run_monitor_tui(progress_file: Path = PROGRESS_FILE) -> None:
             yield Static("Waiting for setup progress...", id="status")
             with TabbedContent(initial="resources", id="monitor-tabs"):
                 with TabPane("Resources", id="resources"):
-                    yield DataTable(id="items")
+                    yield DataTable(id="items", show_cursor=False, cursor_type="none")
                 with TabPane("Files", id="files"):
                     yield DirectoryTree(_resource_tree_path(), id="resource-tree")
             yield Footer()
