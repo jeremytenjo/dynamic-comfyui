@@ -9,7 +9,7 @@ from rich.table import Table
 
 from .banner import print_project_banner
 from .common import ensure_dir, format_size_for_display, now_epoch, probe_remote_file_size, require_tools, utc_timestamp
-from .install_events import InstallEventSink
+from .install_events import InstallEvent, InstallEventSink
 from .default_manifest_url import (
     clear_default_manifest_url_override,
     read_default_manifest_url_override,
@@ -575,6 +575,62 @@ def _print_comfyui_link() -> None:
     print_info(f"ComfyUI page: [url]{gui_url}[/]")
 
 
+def _emit_install_plan_events(
+    event_sink: InstallEventSink | None,
+    merged: MergedManifest,
+    custom_nodes_dir: Path,
+    comfyui_dir: Path,
+    deferred_files: list[FileSpec],
+) -> None:
+    if event_sink is None:
+        return
+
+    seen_nodes: set[str] = set()
+    for node in merged.merged_custom_nodes:
+        target = f"custom_nodes/{node.repo_dir}"
+        if target in seen_nodes:
+            continue
+        seen_nodes.add(target)
+        status = "installed" if (custom_nodes_dir / node.repo_dir).is_dir() else "pending"
+        event_sink.emit(
+            InstallEvent(
+                kind="node_plan",
+                target=target,
+                status=status,
+                message=node.repo,
+            )
+        )
+
+    deferred_targets = {Path(spec.target).as_posix() for spec in deferred_files}
+    seen_files: set[str] = set()
+    for spec in [*merged.merged_files, *deferred_files]:
+        target = Path(spec.target).as_posix()
+        if target in seen_files:
+            continue
+        seen_files.add(target)
+        target_path = comfyui_dir / target
+        total = None
+        downloaded = None
+        if target_path.is_file():
+            status = "installed"
+            total = target_path.stat().st_size
+            downloaded = total
+        elif target in deferred_targets:
+            status = "deferred"
+        else:
+            status = "pending"
+        event_sink.emit(
+            InstallEvent(
+                kind="file_plan",
+                target=target,
+                status=status,
+                downloaded=downloaded,
+                total=total,
+                message=spec.url,
+            )
+        )
+
+
 def _execute_dependency_install(
     ctx: RuntimeContext,
     project_manifest_path: Path,
@@ -606,6 +662,7 @@ def _execute_dependency_install(
         print_info(
             f"Deferring {len(deferred_files)} file download(s) until after ComfyUI starts."
         )
+    _emit_install_plan_events(event_sink, install_merged, custom_nodes_dir, comfyui_dir, deferred_files)
     _print_install_plan_preview(
         install_merged,
         custom_nodes_dir,

@@ -6,9 +6,12 @@ from contextlib import ExitStack
 from pathlib import Path
 from unittest.mock import patch
 
-from dynamic_comfyui_runtime.runtime.manifests import FileSpec, MergedManifest
+from rich.table import Table
+
+from dynamic_comfyui_runtime.runtime.manifests import CustomNode, FileSpec, MergedManifest
 from dynamic_comfyui_runtime.runtime.operations import (
     RuntimeContext,
+    _emit_install_plan_events,
     _print_install_plan_preview,
     run_comfyui_install_flow_foreground,
 )
@@ -23,6 +26,18 @@ class CapturingConsole:
         self.printed.append(item)
 
 
+class CapturingEventSink:
+    def __init__(self) -> None:
+        self.events: list[object] = []
+
+    def emit(self, event: object) -> None:
+        self.events.append(event)
+
+    def prompt_secret(self, message: str) -> str:
+        _ = message
+        return ""
+
+
 class StartDeferredDownloadsTests(unittest.TestCase):
     def _merged(self) -> MergedManifest:
         normal = FileSpec(url="https://example.com/normal.bin", target="models/normal.bin")
@@ -32,9 +47,9 @@ class StartDeferredDownloadsTests(unittest.TestCase):
             start_comfyui_before_downloading=True,
         )
         return MergedManifest(
-            merged_custom_nodes=[],
+            merged_custom_nodes=[CustomNode(repo_dir="ComfyUI-Test", repo="https://example.com/test.git")],
             merged_files=[normal, deferred],
-            default_custom_nodes=[],
+            default_custom_nodes=[CustomNode(repo_dir="ComfyUI-Test", repo="https://example.com/test.git")],
             project_custom_nodes=[],
             default_files=[],
             project_files=[normal, deferred],
@@ -60,11 +75,11 @@ class StartDeferredDownloadsTests(unittest.TestCase):
             ):
                 _print_install_plan_preview(initial, root / "custom_nodes", root, None, deferred_files=deferred)
 
-            tables = fake_console.printed
-            self.assertEqual(len(tables), 1)
-            headers = [column.header for column in tables[0].columns]
+            tables = [item for item in fake_console.printed if isinstance(item, Table)]
+            files_table = tables[-1]
+            headers = [column.header for column in files_table.columns]
             self.assertEqual(headers, ["File", "Source", "Timing", "Size"])
-            timing_cells = tables[0].columns[2]._cells
+            timing_cells = files_table.columns[2]._cells
             self.assertIn("Before ComfyUI", timing_cells)
             self.assertIn("After ComfyUI starts", timing_cells)
 
@@ -84,10 +99,42 @@ class StartDeferredDownloadsTests(unittest.TestCase):
             ):
                 _print_install_plan_preview(initial, root / "custom_nodes", root, None, deferred_files=deferred)
 
-            tables = fake_console.printed
-            self.assertEqual(len(tables), 1)
-            headers = [column.header for column in tables[0].columns]
+            tables = [item for item in fake_console.printed if isinstance(item, Table)]
+            files_table = tables[-1]
+            headers = [column.header for column in files_table.columns]
             self.assertEqual(headers, ["File", "Source", "Size"])
+
+    def test_install_plan_events_include_pending_nodes_and_files(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            custom_nodes_dir = root / "custom_nodes"
+            installed_path = root / "models" / "installed.bin"
+            installed_path.parent.mkdir(parents=True, exist_ok=True)
+            installed_path.write_bytes(b"x" * 12)
+            initial, deferred = split_start_deferred_files(self._merged())
+            installed = FileSpec(url="https://example.com/installed.bin", target="models/installed.bin")
+            initial = MergedManifest(
+                merged_custom_nodes=initial.merged_custom_nodes,
+                merged_files=[*initial.merged_files, installed],
+                default_custom_nodes=initial.default_custom_nodes,
+                project_custom_nodes=initial.project_custom_nodes,
+                default_files=initial.default_files,
+                project_files=[*initial.project_files, installed],
+            )
+            sink = CapturingEventSink()
+
+            _emit_install_plan_events(sink, initial, custom_nodes_dir, root, deferred)
+
+            events_by_target = {event.target: event for event in sink.events}
+            self.assertEqual(events_by_target["custom_nodes/ComfyUI-Test"].kind, "node_plan")
+            self.assertEqual(events_by_target["custom_nodes/ComfyUI-Test"].status, "pending")
+            self.assertEqual(events_by_target["models/normal.bin"].kind, "file_plan")
+            self.assertEqual(events_by_target["models/normal.bin"].status, "pending")
+            self.assertEqual(events_by_target["models/deferred.bin"].kind, "file_plan")
+            self.assertEqual(events_by_target["models/deferred.bin"].status, "deferred")
+            self.assertEqual(events_by_target["models/installed.bin"].status, "installed")
+            self.assertEqual(events_by_target["models/installed.bin"].downloaded, 12)
+            self.assertEqual(events_by_target["models/installed.bin"].total, 12)
 
     def test_foreground_start_launches_deferred_download_after_comfyui_starts(self) -> None:
         with tempfile.TemporaryDirectory() as td:

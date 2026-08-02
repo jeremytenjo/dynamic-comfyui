@@ -74,7 +74,7 @@ def run_install_tui(title: str, worker: Callable[[InstallEventSink], T]) -> T:
     from textual.app import App, ComposeResult
     from textual.containers import Horizontal, Vertical
     from textual.screen import ModalScreen
-    from textual.widgets import Button, DataTable, Footer, Header, MaskedInput, ProgressBar, Sparkline, Static, TabbedContent, TabPane
+    from textual.widgets import Button, DataTable, Footer, Header, MaskedInput, ProgressBar, Sparkline, Static
 
     class _SecretPrompt(ModalScreen[str]):
         CSS = """
@@ -128,30 +128,75 @@ def run_install_tui(title: str, worker: Callable[[InstallEventSink], T]) -> T:
             return self._app.prompt_secret(message)
 
     class _InstallApp(App[_WorkerResult]):
+        AUTO_FOCUS = ""
+        theme = "textual-light"
         CSS = """
         Screen {
             layout: vertical;
         }
 
         #summary {
-            height: 3;
+            height: 2;
             padding: 0 1;
         }
 
         #body {
             height: 1fr;
+            padding: 0 1 1 1;
         }
 
-        #progress-panel {
+        .panel {
+            border: solid $accent;
             padding: 1;
         }
 
+        .panel-title {
+            height: 1;
+            text-style: bold;
+        }
+
+        #progress-panel {
+            height: 7;
+        }
+
         #progress-label {
-            height: 3;
+            height: 1;
         }
 
         #speed-label {
-            height: 3;
+            height: 1;
+        }
+
+        #speed {
+            height: 1;
+        }
+
+        #tables-row {
+            height: 1fr;
+        }
+
+        #files-panel {
+            width: 2fr;
+        }
+
+        #nodes-panel {
+            width: 1fr;
+        }
+
+        #errors-panel {
+            height: 7;
+        }
+
+        #downloads {
+            height: 1fr;
+        }
+
+        #nodes {
+            height: 1fr;
+        }
+
+        #errors {
+            height: 1fr;
         }
         """
         def __init__(self) -> None:
@@ -167,29 +212,35 @@ def run_install_tui(title: str, worker: Callable[[InstallEventSink], T]) -> T:
         def compose(self) -> ComposeResult:
             yield Header(show_clock=True)
             yield Static(title, id="summary")
-            with TabbedContent(initial="overview", id="body"):
-                with TabPane("Overview", id="overview"):
+            with Vertical(id="body"):
+                with Vertical(id="progress-panel", classes="panel"):
+                    yield Static("Download Progress", classes="panel-title")
                     yield Static("Waiting for downloads...", id="progress-label")
                     yield ProgressBar(id="progress", show_eta=False)
                     yield Static("Download speed: waiting", id="speed-label")
                     yield Sparkline([], id="speed")
-                with TabPane("Downloads", id="downloads-tab"):
-                    yield DataTable(id="downloads")
-                with TabPane("Nodes", id="nodes-tab"):
-                    yield DataTable(id="nodes")
-                with TabPane("Errors", id="errors-tab"):
+                with Horizontal(id="tables-row"):
+                    with Vertical(id="files-panel", classes="panel"):
+                        yield Static("Files", classes="panel-title")
+                        yield DataTable(id="downloads")
+                    with Vertical(id="nodes-panel", classes="panel"):
+                        yield Static("Custom Nodes", classes="panel-title")
+                        yield DataTable(id="nodes")
+                with Vertical(id="errors-panel", classes="panel"):
+                    yield Static("Errors (0)", id="errors-title", classes="panel-title")
                     yield DataTable(id="errors")
             yield Footer()
 
         def on_mount(self) -> None:
             downloads = self.query_one("#downloads", DataTable)
-            downloads.add_column("Target", key="target")
+            downloads.add_column("File", key="target")
             downloads.add_column("Status", key="status")
             downloads.add_column("Progress", key="progress")
+            downloads.add_column("Source", key="source")
             nodes = self.query_one("#nodes", DataTable)
-            nodes.add_column("Target", key="target")
+            nodes.add_column("Custom Node", key="target")
             nodes.add_column("Status", key="status")
-            nodes.add_column("Detail", key="detail")
+            nodes.add_column("Source / Detail", key="detail")
             errors = self.query_one("#errors", DataTable)
             errors.add_column("Target", key="target")
             errors.add_column("Error", key="error")
@@ -207,13 +258,14 @@ def run_install_tui(title: str, worker: Callable[[InstallEventSink], T]) -> T:
 
         def handle_install_event(self, event: InstallEvent) -> None:
             summary = self.query_one("#summary", Static)
-            summary.update(event.message)
+            if event.kind not in {"file_plan", "node_plan"}:
+                summary.update(event.message)
             if event.kind == "error":
                 self._append_error(event)
             if not event.target:
                 self._update_aggregate_progress()
                 return
-            if event.kind == "node" or event.target.startswith("custom_nodes/"):
+            if event.kind in {"node", "node_plan"} or event.target.startswith("custom_nodes/"):
                 self._update_node(event)
                 return
             self._update_download(event)
@@ -222,16 +274,18 @@ def run_install_tui(title: str, worker: Callable[[InstallEventSink], T]) -> T:
             table = self.query_one("#downloads", DataTable)
             status = event.status or event.kind
             progress = _progress_label(event.downloaded, event.total)
-            if event.kind == "download" and event.downloaded is not None:
+            if event.kind in {"download", "file_plan"} and event.downloaded is not None:
                 self._record_speed(event)
                 self._progress_by_target[event.target] = (event.downloaded, event.total)
                 self._update_aggregate_progress()
             if event.target not in self._download_row_keys:
-                self._download_row_keys[event.target] = table.add_row(event.target, status, progress)
-                return
-            row_key = self._download_row_keys[event.target]
-            table.update_cell(row_key, "status", status)
-            table.update_cell(row_key, "progress", progress)
+                self._download_row_keys[event.target] = table.add_row(event.target, status, progress, event.message)
+            else:
+                row_key = self._download_row_keys[event.target]
+                table.update_cell(row_key, "status", status)
+                table.update_cell(row_key, "progress", progress)
+                if event.kind == "file_plan":
+                    table.update_cell(row_key, "source", event.message)
 
         def _update_node(self, event: InstallEvent) -> None:
             if event.target is None:
@@ -249,7 +303,7 @@ def run_install_tui(title: str, worker: Callable[[InstallEventSink], T]) -> T:
             table = self.query_one("#errors", DataTable)
             self._error_count += 1
             table.add_row(event.target or "-", event.error or event.message)
-            self.query_one(TabbedContent).get_tab("errors-tab").label = f"Errors ({self._error_count})"
+            self.query_one("#errors-title", Static).update(f"Errors ({self._error_count})")
 
         def _record_speed(self, event: InstallEvent) -> None:
             if event.target is None or event.downloaded is None:
@@ -323,6 +377,8 @@ def run_monitor_tui(progress_file: Path = PROGRESS_FILE) -> None:
         return Path.cwd()
 
     class _MonitorApp(App[None]):
+        AUTO_FOCUS = ""
+        theme = "textual-light"
         CSS = """
         Screen {
             layout: vertical;
